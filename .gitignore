@@ -1,0 +1,13 @@
+**/*.o
+**/*.d
+**/*.a
+**/*.bazel
+**/*.bazel.lock
+**/bazel-*
+**/*.pprof
+**/*.test
+**/.DS_Store
+**/__pycache__
+**/build
+**/.env
+**/tests/JSONTestSuite
