@@ -1,8 +1,38 @@
 # sjson
 
+[![CI](https://github.com/linkxzhou/sjson/workflows/CI/badge.svg)](https://github.com/linkxzhou/sjson/actions/workflows/ci.yml)
+
 ## 功能
 
 sjson 是一个高性能的 Go 语言 JSON 解析库，提供了高效的 JSON 编码和解码功能。它采用直接解码技术，无需中间 Value 对象，从而提高解析效率。
+
+## 测试覆盖率和质量保证
+
+本项目采用严格的质量保证流程：
+
+- **自动化测试**: 支持 Go 1.20-1.24 多版本测试
+- **代码覆盖率**: 目标覆盖率 > 90%，通过 Codecov 监控
+- **代码质量**: 集成 golangci-lint 进行静态代码分析
+- **安全扫描**: 使用 Gosec 和 CodeQL 进行安全漏洞检测
+- **性能监控**: 每次提交都会运行基准测试
+- **依赖管理**: Dependabot 自动更新依赖并检查安全漏洞
+
+### 运行测试
+
+```bash
+# 运行所有测试
+go test -v ./...
+
+# 运行测试并生成覆盖率报告
+go test -v -race -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+
+# 运行基准测试
+go test -bench=. -benchmem ./...
+
+# 运行代码质量检查
+golangci-lint run
+```
 
 ## 特性
 
@@ -18,7 +48,7 @@ sjson 是一个高性能的 Go 语言 JSON 解析库，提供了高效的 JSON �
 ## 安装
 
 ```bash
-go get github.com/mylib/go/sjson
+go get github.com/linkxzhou/sjson
 ```
 
 ## 使用示例
@@ -30,7 +60,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/mylib/go/sjson"
+	"github.com/linkxzhou/sjson"
 )
 
 func main() {
@@ -68,7 +98,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/mylib/go/sjson"
+	"github.com/linkxzhou/sjson"
 )
 
 func main() {
@@ -99,7 +129,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/mylib/go/sjson"
+	"github.com/linkxzhou/sjson"
 	"strings"
 )
 
@@ -131,7 +161,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/mylib/go/sjson"
+	"github.com/linkxzhou/sjson"
 )
 
 func main() {
@@ -192,7 +222,7 @@ sjson 库的性能目标是接近或超过标准库 `encoding/json`，同时提�
 ```
 goos: darwin
 goarch: arm64
-pkg: github.com/mylib/go/sjson
+pkg: github.com/linkxzhou/sjson
 cpu: Apple M4 Pro
 BenchmarkDecoder_Generic_Sonic-14                	  787606	     14063 ns/op	 789.32 MB/s	   43942 B/op	     106 allocs/op
 BenchmarkDecoder_Generic_StdLib-14               	  199702	     57981 ns/op	 191.44 MB/s	   49464 B/op	     795 allocs/op
@@ -218,7 +248,7 @@ PASS
 ```
 goos: darwin
 goarch: arm64
-pkg: github.com/mylib/go/sjson
+pkg: github.com/linkxzhou/sjson
 cpu: Apple M4 Pro
 BenchmarkEncoder_Generic_Sonic-14                	  461450	     24943 ns/op	 445.01 MB/s	   13206 B/op	      40 allocs/op
 BenchmarkEncoder_Generic_StdLib-14               	  323244	     37163 ns/op	 298.68 MB/s	   32909 B/op	     653 allocs/op

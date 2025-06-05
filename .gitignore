@@ -11,3 +11,4 @@
 **/build
 **/.env
 **/tests/JSONTestSuite
+**/tests/example
