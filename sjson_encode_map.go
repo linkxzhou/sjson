@@ -9,7 +9,10 @@ import (
 )
 
 // map[string]interface{} 专用编码器
-type mapStringInterfaceEncoder struct{}
+type mapStringInterfaceEncoder struct {
+	keyType   reflect.Type
+	valueType reflect.Type
+}
 
 // 为 mapStringInterfaceEncoder 添加 appendToBytes 方法
 func (e mapStringInterfaceEncoder) appendToBytes(stream *encoderStream, src reflect.Value) error {
@@ -24,69 +27,115 @@ func (e mapStringInterfaceEncoder) appendToBytes(stream *encoderStream, src refl
 		return nil
 	}
 
+	// 预估缓冲区大小：每个键值对大约需要20字节（键名+引号+冒号+值+逗号）
+	estimatedSize := mapLen * 20
+	if cap(stream.buffer)-len(stream.buffer) < estimatedSize {
+		newBuffer := make([]byte, len(stream.buffer), len(stream.buffer)+estimatedSize)
+		copy(newBuffer, stream.buffer)
+		stream.buffer = newBuffer
+	}
+
 	// 开始构建JSON对象
 	stream.buffer = append(stream.buffer, '{')
 
-	var (
-		mi  = src.MapRange()
-		err error
-	)
+	var mi = src.MapRange()
 
+	// 根据map大小选择不同的编码策略
+	if mapLen == 1 {
+		return e.encodeSinglePair(stream, mi)
+	}
+
+	return e.encodeMultiplePairs(stream, mi, mapLen)
+
+}
+
+// 编码单个键值对（优化路径）
+func (e mapStringInterfaceEncoder) encodeSinglePair(stream *encoderStream, mi *reflect.MapIter) error {
+	mi.Next()
+	ks, err := resolveKeyName(mi.Key())
+	if err != nil {
+		return fmt.Errorf("json: encoding error for map key: %q", err.Error())
+	}
+
+	stream.buffer = append(stream.buffer, '"')
+	stream.buffer = append(stream.buffer, ks...)
+	stream.buffer = append(stream.buffer, '"', ':')
+
+	miValue := mi.Value()
+	elemEncoder := getEncoder(miValue.Type())
+	err = elemEncoder.appendToBytes(stream, miValue)
+	if err != nil {
+		return err
+	}
+
+	stream.buffer = append(stream.buffer, '}')
+	return nil
+}
+
+// 编码多个键值对
+func (e mapStringInterfaceEncoder) encodeMultiplePairs(stream *encoderStream, mi *reflect.MapIter, mapLen int) error {
 	if defaultConfig.SortMapKeys {
-		sv := make([]reflectWithString, src.Len())
+		return e.encodeSortedPairs(stream, mi, mapLen)
+	}
+	return e.encodeUnsortedPairs(stream, mi)
+}
 
-		for i := 0; mi.Next(); i++ {
-			if sv[i].ks, err = resolveKeyName(mi.Key()); err != nil {
-				return fmt.Errorf("json: encoding error for type %q: %q",
-					src.Type().String(), err.Error())
-			}
-			sv[i].v = mi.Value()
+// 编码排序的键值对
+func (e mapStringInterfaceEncoder) encodeSortedPairs(stream *encoderStream, mi *reflect.MapIter, mapLen int) error {
+	sv := make([]reflectWithString, mapLen)
+
+	for i := 0; mi.Next(); i++ {
+		ks, err := resolveKeyName(mi.Key())
+		if err != nil {
+			return fmt.Errorf("json: encoding error for map key: %q", err.Error())
+		}
+		sv[i].ks = ks
+		sv[i].v = mi.Value()
+	}
+
+	slices.SortFunc(sv, func(i, j reflectWithString) int {
+		return bytes.Compare(i.ks, j.ks)
+	})
+
+	for i, kv := range sv {
+		if i > 0 {
+			stream.buffer = append(stream.buffer, ',')
+		}
+		stream.buffer = append(stream.buffer, '"')
+		stream.buffer = append(stream.buffer, kv.ks...)
+		stream.buffer = append(stream.buffer, '"', ':')
+
+		elemEncoder := getEncoder(kv.v.Type())
+		err := elemEncoder.appendToBytes(stream, kv.v)
+		if err != nil {
+			return err
+		}
+	}
+
+	stream.buffer = append(stream.buffer, '}')
+	return nil
+}
+
+// 编码未排序的键值对（快速路径）
+func (e mapStringInterfaceEncoder) encodeUnsortedPairs(stream *encoderStream, mi *reflect.MapIter) error {
+	for i := 0; mi.Next(); i++ {
+		ks, err := resolveKeyName(mi.Key())
+		if err != nil {
+			return fmt.Errorf("json: encoding error for map key: %q", err.Error())
 		}
 
-		slices.SortFunc(sv, func(i, j reflectWithString) int {
-			return bytes.Compare(i.ks, j.ks)
-		})
-
-		for i, kv := range sv {
-			if i > 0 {
-				stream.buffer = append(stream.buffer, ',')
-			}
-			stream.buffer = append(stream.buffer, '"')
-			stream.buffer = append(stream.buffer, kv.ks...)
-			stream.buffer = append(stream.buffer, '"')
-			stream.buffer = append(stream.buffer, ':')
-			kvValue := kv.v
-
-			// 获取元素的编码器
-			elemEncoder := getEncoder(kvValue.Type())
-			err = elemEncoder.appendToBytes(stream, kvValue)
-			if err != nil {
-				return err
-			}
+		if i > 0 {
+			stream.buffer = append(stream.buffer, ',')
 		}
-	} else {
-		for i := 0; mi.Next(); i++ {
-			ks, err := resolveKeyName(mi.Key())
-			if err != nil {
-				return fmt.Errorf("json: encoding error for type %q: %q",
-					src.Type().String(), err.Error())
-			}
+		stream.buffer = append(stream.buffer, '"')
+		stream.buffer = append(stream.buffer, ks...)
+		stream.buffer = append(stream.buffer, '"', ':')
 
-			if i > 0 {
-				stream.buffer = append(stream.buffer, ',')
-			}
-			stream.buffer = append(stream.buffer, '"')
-			stream.buffer = append(stream.buffer, ks...)
-			stream.buffer = append(stream.buffer, '"')
-			stream.buffer = append(stream.buffer, ':')
-			miValue := mi.Value()
-
-			// 获取元素的编码器
-			elemEncoder := getEncoder(miValue.Type())
-			err = elemEncoder.appendToBytes(stream, miValue)
-			if err != nil {
-				return err
-			}
+		miValue := mi.Value()
+		elemEncoder := getEncoder(miValue.Type())
+		err = elemEncoder.appendToBytes(stream, miValue)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -95,7 +144,9 @@ func (e mapStringInterfaceEncoder) appendToBytes(stream *encoderStream, src refl
 }
 
 type mapEncoder struct {
-	valueType reflect.Type
+	keyType      reflect.Type
+	valueType    reflect.Type
+	valueEncoder Encoder // 预缓存值编码器
 }
 
 // 为 mapEncoder 添加 appendToBytes 方法
@@ -111,64 +162,110 @@ func (e mapEncoder) appendToBytes(stream *encoderStream, src reflect.Value) erro
 		return nil
 	}
 
-	// 确定 value 类型，只需要获取一次 elemEncoder 即可
-	elemEncoder := getEncoder(e.valueType)
+	// 预估缓冲区大小
+	estimatedSize := mapLen * 20
+	if cap(stream.buffer)-len(stream.buffer) < estimatedSize {
+		newBuffer := make([]byte, len(stream.buffer), len(stream.buffer)+estimatedSize)
+		copy(newBuffer, stream.buffer)
+		stream.buffer = newBuffer
+	}
+
 	// 开始构建JSON对象
 	stream.buffer = append(stream.buffer, '{')
 
-	var (
-		err error
-		mi  = src.MapRange()
-	)
+	var mi = src.MapRange()
 
+	// 根据map大小选择不同的编码策略
+	if mapLen == 1 {
+		return e.encodeSinglePair(stream, mi)
+	}
+
+	return e.encodeMultiplePairs(stream, mi, mapLen)
+
+}
+
+// 编码单个键值对（优化路径）
+func (e mapEncoder) encodeSinglePair(stream *encoderStream, mi *reflect.MapIter) error {
+	mi.Next()
+	ks, err := resolveKeyName(mi.Key())
+	if err != nil {
+		return fmt.Errorf("json: encoding error for map key: %q", err.Error())
+	}
+
+	stream.buffer = append(stream.buffer, '"')
+	stream.buffer = append(stream.buffer, ks...)
+	stream.buffer = append(stream.buffer, '"', ':')
+
+	err = e.valueEncoder.appendToBytes(stream, mi.Value())
+	if err != nil {
+		return err
+	}
+
+	stream.buffer = append(stream.buffer, '}')
+	return nil
+}
+
+// 编码多个键值对
+func (e mapEncoder) encodeMultiplePairs(stream *encoderStream, mi *reflect.MapIter, mapLen int) error {
 	if defaultConfig.SortMapKeys {
-		sv := make([]reflectWithString, mapLen)
+		return e.encodeSortedPairs(stream, mi, mapLen)
+	}
+	return e.encodeUnsortedPairs(stream, mi)
+}
 
-		for i := 0; mi.Next(); i++ {
-			if sv[i].ks, err = resolveKeyName(mi.Key()); err != nil {
-				return fmt.Errorf("json: encoding error for type %q: %q",
-					src.Type().String(), err.Error())
-			}
-			sv[i].v = mi.Value()
+// 编码排序的键值对
+func (e mapEncoder) encodeSortedPairs(stream *encoderStream, mi *reflect.MapIter, mapLen int) error {
+	sv := make([]reflectWithString, mapLen)
+
+	for i := 0; mi.Next(); i++ {
+		ks, err := resolveKeyName(mi.Key())
+		if err != nil {
+			return fmt.Errorf("json: encoding error for map key: %q", err.Error())
+		}
+		sv[i].ks = ks
+		sv[i].v = mi.Value()
+	}
+
+	slices.SortFunc(sv, func(i, j reflectWithString) int {
+		return bytes.Compare(i.ks, j.ks)
+	})
+
+	for i, kv := range sv {
+		if i > 0 {
+			stream.buffer = append(stream.buffer, ',')
+		}
+		stream.buffer = append(stream.buffer, '"')
+		stream.buffer = append(stream.buffer, kv.ks...)
+		stream.buffer = append(stream.buffer, '"', ':')
+
+		err := e.valueEncoder.appendToBytes(stream, kv.v)
+		if err != nil {
+			return err
+		}
+	}
+
+	stream.buffer = append(stream.buffer, '}')
+	return nil
+}
+
+// 编码未排序的键值对（快速路径）
+func (e mapEncoder) encodeUnsortedPairs(stream *encoderStream, mi *reflect.MapIter) error {
+	for i := 0; mi.Next(); i++ {
+		ks, err := resolveKeyName(mi.Key())
+		if err != nil {
+			return fmt.Errorf("json: encoding error for map key: %q", err.Error())
 		}
 
-		slices.SortFunc(sv, func(i, j reflectWithString) int {
-			return bytes.Compare(i.ks, j.ks)
-		})
-
-		for i, kv := range sv {
-			if i > 0 {
-				stream.buffer = append(stream.buffer, ',')
-			}
-			stream.buffer = append(stream.buffer, '"')
-			stream.buffer = append(stream.buffer, kv.ks...)
-			stream.buffer = append(stream.buffer, '"')
-			stream.buffer = append(stream.buffer, ':')
-			err = elemEncoder.appendToBytes(stream, kv.v)
-			if err != nil {
-				return err
-			}
+		if i > 0 {
+			stream.buffer = append(stream.buffer, ',')
 		}
-	} else {
-		for i := 0; mi.Next(); i++ {
-			ks, err := resolveKeyName(mi.Key())
-			if err != nil {
-				return fmt.Errorf("json: encoding error for type %q: %q",
-					src.Type().String(), err.Error())
-			}
+		stream.buffer = append(stream.buffer, '"')
+		stream.buffer = append(stream.buffer, ks...)
+		stream.buffer = append(stream.buffer, '"', ':')
 
-			if i > 0 {
-				stream.buffer = append(stream.buffer, ',')
-			}
-
-			stream.buffer = append(stream.buffer, '"')
-			stream.buffer = append(stream.buffer, ks...)
-			stream.buffer = append(stream.buffer, '"')
-			stream.buffer = append(stream.buffer, ':')
-			err = elemEncoder.appendToBytes(stream, mi.Value())
-			if err != nil {
-				return err
-			}
+		err = e.valueEncoder.appendToBytes(stream, mi.Value())
+		if err != nil {
+			return err
 		}
 	}
 

@@ -10,11 +10,14 @@ type structField struct {
 	index     int
 	omitempty bool
 	typ       reflect.Type
+	encoder   Encoder // 预缓存字段编码器
 }
 
 type structEncoder struct {
-	typ    reflect.Type
-	fields []structField
+	typ          reflect.Type
+	fields       []structField
+	numFields    int  // 字段数量，用于优化分发
+	hasOmitEmpty bool // 是否有omitempty字段
 }
 
 // 添加appendToBytes方法，将结构体直接编码到字节切片
@@ -27,14 +30,103 @@ func (e *structEncoder) appendToBytes(stream *encoderStream, src reflect.Value) 
 		src = src.Elem()
 	}
 
+	// 预估缓冲区大小，减少重新分配
+	estimatedSize := e.estimateSize()
+	if cap(stream.buffer)-len(stream.buffer) < estimatedSize {
+		newBuf := make([]byte, len(stream.buffer), len(stream.buffer)+estimatedSize)
+		copy(newBuf, stream.buffer)
+		stream.buffer = newBuf
+	}
+
 	// 开始对象
 	stream.buffer = append(stream.buffer, '{')
 
-	var err error
+	// 根据字段数量选择不同的编码策略
+	switch e.numFields {
+	case 0:
+		// 空结构体，直接返回
+		stream.buffer = append(stream.buffer, '}')
+		return nil
+	case 1:
+		// 单字段优化：直接处理，无需循环
+		return e.encodeSingleField(stream, src)
+	default:
+		// 多字段：根据是否有omitempty选择策略
+		if e.hasOmitEmpty {
+			return e.encodeFieldsWithOmitEmpty(stream, src)
+		} else {
+			return e.encodeFieldsFast(stream, src)
+		}
+	}
+}
 
-	// 逐个编码字段
+// 估算编码后的大小
+func (e *structEncoder) estimateSize() int {
+	// 基础大小：{} + 字段名引号和冒号
+	size := 2
+	for _, field := range e.fields {
+		// 字段名 + 引号 + 冒号 + 逗号 + 估算值大小
+		size += len(field.name) + 4 + 20 // 20是值的估算大小
+	}
+	return size
+}
+
+// 单字段编码优化
+func (e *structEncoder) encodeSingleField(stream *encoderStream, src reflect.Value) error {
+	field := e.fields[0]
+	f := src.Field(field.index)
+
+	// 处理omitempty
+	if field.omitempty && isEmptyValue(f) {
+		stream.buffer = append(stream.buffer, '}')
+		return nil
+	}
+
+	// 写入字段名
+	stream.buffer = append(stream.buffer, '"')
+	stream.buffer = append(stream.buffer, field.name...)
+	stream.buffer = append(stream.buffer, '"', ':')
+
+	// 编码字段值
+	err := field.encoder.appendToBytes(stream, f)
+	if err != nil {
+		return err
+	}
+
+	stream.buffer = append(stream.buffer, '}')
+	return nil
+}
+
+// 快速编码（无omitempty字段）
+func (e *structEncoder) encodeFieldsFast(stream *encoderStream, src reflect.Value) error {
 	for i, field := range e.fields {
-		// 获取字段值
+		// 添加逗号分隔符
+		if i > 0 {
+			stream.buffer = append(stream.buffer, ',')
+		}
+
+		// 写入字段名
+		stream.buffer = append(stream.buffer, '"')
+		stream.buffer = append(stream.buffer, field.name...)
+		stream.buffer = append(stream.buffer, '"', ':')
+
+		// 编码字段值
+		f := src.Field(field.index)
+		err := field.encoder.appendToBytes(stream, f)
+		if err != nil {
+			return err
+		}
+	}
+
+	stream.buffer = append(stream.buffer, '}')
+	return nil
+}
+
+// 带omitempty的编码
+func (e *structEncoder) encodeFieldsWithOmitEmpty(stream *encoderStream, src reflect.Value) error {
+	firstField := true
+
+	for _, field := range e.fields {
 		f := src.Field(field.index)
 
 		// 处理omitempty标签
@@ -42,19 +134,19 @@ func (e *structEncoder) appendToBytes(stream *encoderStream, src reflect.Value) 
 			continue
 		}
 
-		// 添加逗号分隔符（非第一个字段）
-		if i > 0 {
+		// 添加逗号分隔符
+		if !firstField {
 			stream.buffer = append(stream.buffer, ',')
 		}
+		firstField = false
 
-		// 写入字段名（使用之前实现的appendMapKey函数）
+		// 写入字段名
 		stream.buffer = append(stream.buffer, '"')
 		stream.buffer = append(stream.buffer, field.name...)
 		stream.buffer = append(stream.buffer, '"', ':')
 
-		elemEncoder := getEncoder(field.typ)
 		// 编码字段值
-		err = elemEncoder.appendToBytes(stream, f)
+		err := field.encoder.appendToBytes(stream, f)
 		if err != nil {
 			return err
 		}

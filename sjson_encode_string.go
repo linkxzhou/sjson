@@ -77,6 +77,7 @@ func escapeStringToBytes(buf []byte, c byte) []byte {
 type stringEncoder struct{}
 
 // 为stringEncoder添加appendToBytes方法
+//go:inline
 func (e stringEncoder) appendToBytes(stream *encoderStream, src reflect.Value) error {
 	s := src.String()
 
@@ -85,34 +86,60 @@ func (e stringEncoder) appendToBytes(stream *encoderStream, src reflect.Value) e
 		return nil
 	}
 
+	// 预分配足够的空间，减少重新分配
+	needed := len(s) + 2 // 至少需要字符串长度+2个引号
+	if cap(stream.buffer)-len(stream.buffer) < needed {
+		newCap := cap(stream.buffer) * 2
+		if newCap < len(stream.buffer)+needed {
+			newCap = len(stream.buffer) + needed
+		}
+		newBuf := make([]byte, len(stream.buffer), newCap)
+		copy(newBuf, stream.buffer)
+		stream.buffer = newBuf
+	}
+
 	stream.buffer = append(stream.buffer, '"')
 
-	// 单次循环，边检查边处理
-	start := 0
-	for i := 0; i < len(s); {
-		if c := s[i]; c < utf8.RuneSelf {
-			if !safeSet[c] {
-				// 需要转义的字符
-				if start < i {
-					stream.buffer = append(stream.buffer, s[start:i]...)
-				}
-				stream.buffer = escapeStringToBytes(stream.buffer, c)
-				i++
-				start = i
-			} else {
-				// 安全字符，继续
-				i++
-			}
-		} else {
-			// 处理非ASCII字符（UTF-8）
-			_, size := utf8.DecodeRuneInString(s[i:])
-			i += size
+	// 快速路径：检查是否需要转义
+	needsEscape := false
+	for i := 0; i < len(s); i++ {
+		if s[i] < utf8.RuneSelf && !safeSet[s[i]] {
+			needsEscape = true
+			break
 		}
 	}
 
-	// 添加剩余部分
-	if start < len(s) {
-		stream.buffer = append(stream.buffer, s[start:]...)
+	if !needsEscape {
+		// 无需转义，直接添加
+		stream.buffer = append(stream.buffer, s...)
+	} else {
+		// 需要转义，单次循环处理
+		start := 0
+		for i := 0; i < len(s); {
+			if c := s[i]; c < utf8.RuneSelf {
+				if !safeSet[c] {
+					// 需要转义的字符
+					if start < i {
+						stream.buffer = append(stream.buffer, s[start:i]...)
+					}
+					stream.buffer = escapeStringToBytes(stream.buffer, c)
+					i++
+					start = i
+				} else {
+					// 安全字符，继续
+					i++
+				}
+			} else {
+				// 处理非ASCII字符（UTF-8）
+				_, size := utf8.DecodeRuneInString(s[i:])
+				i += size
+			}
+		}
+
+		// 添加剩余部分
+		if start < len(s) {
+			stream.buffer = append(stream.buffer, s[start:]...)
+		}
 	}
 
 	stream.buffer = append(stream.buffer, '"')

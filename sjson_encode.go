@@ -123,12 +123,19 @@ func getEncoder(t reflect.Type) Encoder {
 			reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			if t.Elem().Kind() == reflect.Interface {
-				enc = mapStringInterfaceEncoder{}
+				enc = mapStringInterfaceEncoder{
+					keyType:   t.Key(),
+					valueType: t.Elem(),
+				}
 			} else {
 				if cachedEnc, ok := mapEncoderPool.Load(t.Elem()); ok {
 					enc = cachedEnc.(Encoder)
 				} else {
-					mapEnc := mapEncoder{valueType: t.Elem()}
+					mapEnc := mapEncoder{
+						keyType:      t.Key(),
+						valueType:    t.Elem(),
+						valueEncoder: getEncoder(t.Elem()),
+					}
 					mapEncoderPool.Store(t.Elem(), mapEnc)
 					enc = mapEnc
 				}
@@ -139,9 +146,21 @@ func getEncoder(t reflect.Type) Encoder {
 	case reflect.Struct:
 		// 结构体编码器优化，预缓存字段信息
 		fields := getStructFields(t)
+
+		// 统计字段信息用于优化
+		hasOmitEmpty := false
+		for _, field := range fields {
+			if field.omitempty {
+				hasOmitEmpty = true
+				break
+			}
+		}
+
 		enc = &structEncoder{
-			typ:    t,
-			fields: fields,
+			typ:          t,
+			fields:       fields,
+			numFields:    len(fields),
+			hasOmitEmpty: hasOmitEmpty,
 		}
 	case reflect.Interface:
 		enc = interfaceEncoderInst

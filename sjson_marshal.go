@@ -13,7 +13,7 @@ type encoderStream struct {
 var encoderStreamPool = sync.Pool{
 	New: func() interface{} {
 		stream := &encoderStream{
-			buffer: make([]byte, 0, 1024),
+			buffer: make([]byte, 0, 2048), // 增加初始容量
 		}
 		return stream
 	},
@@ -26,7 +26,12 @@ func getEncoderStream() *encoderStream {
 
 // 释放一个编码器流
 func releaseEncoderStream(stream *encoderStream) {
-	stream.buffer = stream.buffer[:0]
+	// 如果缓冲区过大，重新分配以避免内存泄漏
+	if cap(stream.buffer) > 8192 {
+		stream.buffer = make([]byte, 0, 2048)
+	} else {
+		stream.buffer = stream.buffer[:0]
+	}
 	encoderStreamPool.Put(stream)
 }
 

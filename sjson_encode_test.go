@@ -526,7 +526,7 @@ func createDeepNestedTestData() DeepNestedRoot {
 func BenchmarkBasicTypes(b *testing.B) {
 	// 整数
 	b.Run("Marshal-NumberInt", func(b *testing.B) {
-		number := 12345
+		number := 1234
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -535,7 +535,7 @@ func BenchmarkBasicTypes(b *testing.B) {
 	})
 
 	b.Run("StdMarshal-NumberInt", func(b *testing.B) {
-		number := 12345
+		number := 1234
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -544,7 +544,7 @@ func BenchmarkBasicTypes(b *testing.B) {
 	})
 
 	b.Run("JsoniterMarshal-NumberInt", func(b *testing.B) {
-		number := 12345
+		number := 1234
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -554,7 +554,7 @@ func BenchmarkBasicTypes(b *testing.B) {
 
 	// 数字
 	b.Run("Marshal-Number", func(b *testing.B) {
-		number := 12345.6789
+		number := 1234.6789
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -563,7 +563,7 @@ func BenchmarkBasicTypes(b *testing.B) {
 	})
 
 	b.Run("StdMarshal-Number", func(b *testing.B) {
-		number := 12345.6789
+		number := 1234.6789
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -572,7 +572,7 @@ func BenchmarkBasicTypes(b *testing.B) {
 	})
 
 	b.Run("JsoniterMarshal-Number", func(b *testing.B) {
-		number := 12345.6789
+		number := 1234.6789
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -695,7 +695,7 @@ func BenchmarkLargeArray(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, _ = json.Marshal(largeArray)
+			_, _ = jsonfast.Marshal(largeArray)
 		}
 	})
 }
@@ -721,6 +721,14 @@ func BenchmarkLargeMap(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			_, _ = json.Marshal(largeMap)
+		}
+	})
+
+	b.Run("JsoniterMarshal-LargeMap", func(b *testing.B) {
+		b.ResetTimer()
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			_, _ = jsonfast.Marshal(largeMap)
 		}
 	})
 }

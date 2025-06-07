@@ -35,13 +35,7 @@ type intEncoder struct{}
 //go:nosplit
 func (e intEncoder) appendToBytes(stream *encoderStream, src reflect.Value) error {
 	intValue := src.Int()
-	if intValue < 0 {
-		stream.buffer = append(stream.buffer, '-')
-		stream.buffer = appendInt(stream.buffer, int64(intValue), 10)
-	} else {
-		stream.buffer = appendInt(stream.buffer, intValue, 10)
-	}
-
+	stream.buffer = appendInt(stream.buffer, intValue, 10)
 	return nil
 }
 
@@ -56,15 +50,46 @@ func (e uintEncoder) appendToBytes(stream *encoderStream, src reflect.Value) err
 
 type float32Encoder struct{}
 
+//go:inline
 func (e float32Encoder) appendToBytes(stream *encoderStream, src reflect.Value) error {
-	stream.buffer = strconv.AppendFloat(stream.buffer, src.Float(), 'f', -1, 64)
-	return nil
+	f := float32(src.Float())
+	return appendFloat32(stream, f)
 }
 
 type float64Encoder struct{}
 
+//go:inline
 func (e float64Encoder) appendToBytes(stream *encoderStream, src reflect.Value) error {
-	stream.buffer = strconv.AppendFloat(stream.buffer, src.Float(), 'f', -1, 32)
+	f := src.Float()
+	return appendFloat64(stream, f)
+}
+
+// 优化的浮点数编码函数，参考 jsoniter 的实现
+//
+//go:inline
+func appendFloat32(stream *encoderStream, f float32) error {
+
+	// 检查是否为整数浮点数
+	if f == float32(int32(f)) && f >= -2147483648 && f <= 2147483647 {
+		stream.buffer = appendInt(stream.buffer, int64(f), 10)
+		return nil
+	}
+
+	// 使用 6 位精度进行快速编码（参考 jsoniter ConfigFastest）
+	stream.buffer = strconv.AppendFloat(stream.buffer, float64(f), 'g', 6, 32)
+	return nil
+}
+
+//go:inline
+func appendFloat64(stream *encoderStream, f float64) error {
+	// 检查是否为整数浮点数
+	if f == float64(int64(f)) && f >= -9223372036854775808 && f <= 9223372036854775807 {
+		stream.buffer = appendInt(stream.buffer, int64(f), 10)
+		return nil
+	}
+
+	// 使用 6 位精度进行快速编码（参考 jsoniter ConfigFastest）
+	stream.buffer = strconv.AppendFloat(stream.buffer, f, 'g', 6, 64)
 	return nil
 }
 

@@ -78,11 +78,15 @@ func getStructFields(t reflect.Type) []structField {
 			}
 		}
 
+		// 预缓存字段编码器
+		fieldEncoder := getEncoder(f.Type)
+
 		fields = append(fields, structField{
 			name:      stringToBytes(name),
 			index:     i,
 			omitempty: omitempty,
 			typ:       f.Type,
+			encoder:   fieldEncoder,
 		})
 	}
 

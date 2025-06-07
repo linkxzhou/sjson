@@ -3,12 +3,12 @@ package sjson
 import (
 	"errors"
 	"math"
-	"reflect"
 	"strconv"
 	"unsafe"
 )
 
 var digits [][]byte
+var singleDigits = [10]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
 
 func init() {
 	// 预计算0-9999的字节表示
@@ -275,30 +275,36 @@ func parseFloatFromBytes(b []byte, bitSize int) (float64, error) {
 }
 
 // stringToBytes 将 string 转换为 []byte，零拷贝（不安全）
+//
+//go:inline
 func stringToBytes(s string) []byte {
-	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	slice := reflect.SliceHeader{
-		Data: sh.Data,
-		Len:  sh.Len,
-		Cap:  sh.Len,
-	}
-	return *(*[]byte)(unsafe.Pointer(&slice))
+	return unsafe.Slice(unsafe.StringData(s), len(s))
 }
 
 // bytesToString 将 []byte 转换为 string，零拷贝（不安全）
 //
 //go:inline
 func bytesToString(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
+	return unsafe.String(unsafe.SliceData(b), len(b))
 }
 
 //go:inline
 //go:nosplit
 //go:nocheckptr
 func appendUint(dst []byte, u uint64, base int) []byte {
+	// 超快速路径：单个数字
+	if u < 10 {
+		return append(dst, singleDigits[u])
+	}
+
 	// 快速路径：小于10000直接查表
 	if u < 10000 {
 		return append(dst, digits[u]...)
+	}
+
+	// 中等数字优化：使用分组处理减少除法运算
+	if u < 100000000 { // 小于1亿，使用优化算法
+		return appendUintOptimized(dst, u)
 	}
 
 	// 大数处理：直接使用标准库
@@ -314,4 +320,56 @@ func appendInt(dst []byte, i int64, base int) []byte {
 		return appendUint(dst, uint64(-i), base)
 	}
 	return appendUint(dst, uint64(i), base)
+}
+
+// 优化的中等数字处理函数，参考 Jsoniter 和高性能 itoa 实现
+//
+//go:inline
+//go:nosplit
+func appendUintOptimized(dst []byte, u uint64) []byte {
+	// 预计算数字位数，避免重复计算
+	var digitCount int
+	temp := u
+	for {
+		digitCount++
+		temp /= 10
+		if temp == 0 {
+			break
+		}
+	}
+
+	// 预分配空间
+	start := len(dst)
+	dst = append(dst, make([]byte, digitCount)...)
+
+	// 从右到左填充数字，使用查表优化
+	pos := start + digitCount - 1
+	for u >= 100 {
+		// 每次处理两位数字，减少除法运算
+		q := u / 100
+		r := u % 100
+		u = q
+
+		// 使用预计算的两位数字表
+		if r < 10 {
+			dst[pos] = singleDigits[r]
+			pos--
+		} else {
+			twoDigits := digits[r]
+			dst[pos] = twoDigits[1]
+			dst[pos-1] = twoDigits[0]
+			pos -= 2
+		}
+	}
+
+	// 处理剩余的1-2位数字
+	if u >= 10 {
+		twoDigits := digits[u]
+		dst[pos] = twoDigits[1]
+		dst[pos-1] = twoDigits[0]
+	} else {
+		dst[pos] = singleDigits[u]
+	}
+
+	return dst
 }
