@@ -5,6 +5,7 @@
 **/*.bazel.lock
 **/bazel-*
 **/*.pprof
+**/*.prof
 **/*.test
 **/.DS_Store
 **/__pycache__

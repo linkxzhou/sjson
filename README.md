@@ -217,6 +217,71 @@ sjson 库采用了多种性能优化技术：
 
 sjson 库的性能目标是接近或超过标准库 `encoding/json`，同时提供更简洁的 API 和更好的可扩展性。
 
+### 1. Unmarshal 性能对比图（ns/op）
+
+```mermaid
+xychart-beta
+    title "JSON Unmarshal 性能对比 (ns/op, 越低越好)"
+    x-axis ["Sonic", "StdLib", "Sjson", "Jsoniter"]
+    y-axis "时间 (ns/op)" 0 --> 60000
+    bar "Generic" [14063, 57981, 41910, 36358]
+    bar "Binding" [13697, 51432, 24466, 13520]
+    bar "Parallel Generic" [3553, 14095, 12037, 12172]
+    bar "Parallel Binding" [1863, 7290, 4635, 2374]
+```
+
+### 2. Unmarshal 吞吐量对比图（MB/s）
+
+```mermaid
+xychart-beta
+    title "JSON Unmarshal 吞吐量对比 (MB/s, 越高越好)"
+    x-axis ["Sonic", "StdLib", "Sjson", "Jsoniter"]
+    y-axis "吞吐量 (MB/s)" 0 --> 6000
+    bar "Generic" [789.32, 191.44, 264.85, 305.30]
+    bar "Binding" [810.41, 215.82, 453.70, 821.00]
+    bar "Parallel Generic" [3124.43, 787.51, 922.13, 911.90]
+    bar "Parallel Binding" [5958.52, 1522.58, 2394.96, 4675.40]
+```
+
+### 3. Marshal 性能对比图（ns/op）
+
+```mermaid
+xychart-beta
+    title "JSON Marshal 性能对比 (ns/op, 越低越好)"
+    x-axis ["Sonic", "StdLib", "Sjson", "Jsoniter"]
+    y-axis "时间 (ns/op)" 0 --> 40000
+    bar "Generic" [24943, 37163, 26895, 16218]
+    bar "Binding" [8457, 7152, 7881, 8418]
+    bar "Parallel Generic" [5203, 10401, 9384, 3393]
+    bar "Parallel Binding" [1374, 1157, 1673, 1229]
+```
+
+### 4. Marshal 吞吐量对比图（MB/s）
+
+```mermaid
+xychart-beta
+    title "JSON Marshal 吞吐量对比 (MB/s, 越高越好)"
+    x-axis ["Sonic", "StdLib", "Sjson", "Jsoniter"]
+    y-axis "吞吐量 (MB/s)" 0 --> 10000
+    bar "Generic" [445.01, 298.68, 412.71, 684.44]
+    bar "Binding" [1312.49, 1552.09, 1408.42, 1318.61]
+    bar "Parallel Generic" [2133.32, 1067.22, 1182.92, 3271.41]
+    bar "Parallel Binding" [8075.76, 9594.99, 6635.75, 9029.83]
+```
+
+### 5. 内存分配对比图（B/op）
+
+```mermaid
+xychart-beta
+    title "JSON 处理内存分配对比 (B/op, 越低越好)"
+    x-axis ["Sonic", "StdLib", "Sjson", "Jsoniter"]
+    y-axis "内存分配 (B/op)" 0 --> 60000
+    bar "Unmarshal Generic" [43942, 49464, 45661, 54393]
+    bar "Unmarshal Binding" [18540, 11416, 9404, 10704]
+    bar "Marshal Generic" [13206, 32909, 19312, 17999]
+    bar "Marshal Binding" [9594, 9479, 9479, 9487]
+```
+
 ### 1. Unmarshal 性能测试
 
 ```
