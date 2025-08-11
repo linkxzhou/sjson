@@ -6,7 +6,29 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"sync"
 )
+
+// 对象池优化：复用 reflectWithString 切片
+var reflectWithStringPool = sync.Pool{
+	New: func() interface{} {
+		return make([]reflectWithString, 0, 16)
+	},
+}
+
+func getReflectWithStringSlice(size int) []reflectWithString {
+	slice := reflectWithStringPool.Get().([]reflectWithString)
+	if cap(slice) < size {
+		return make([]reflectWithString, 0, size)
+	}
+	return slice[:0]
+}
+
+func putReflectWithStringSlice(slice []reflectWithString) {
+	if cap(slice) <= 64 { // 避免池中对象过大
+		reflectWithStringPool.Put(slice)
+	}
+}
 
 // map[string]interface{} 专用编码器
 type mapStringInterfaceEncoder struct {
@@ -62,7 +84,7 @@ func (e mapStringInterfaceEncoder) encodeSinglePair(stream *encoderStream, mi *r
 	stream.buffer = append(stream.buffer, '"', ':')
 
 	miValue := mi.Value()
-	elemEncoder := getEncoder(miValue.Type())
+	elemEncoder := getEncoderFast(miValue.Type())
 	err = elemEncoder.appendToBytes(stream, miValue)
 	if err != nil {
 		return err
@@ -82,7 +104,15 @@ func (e mapStringInterfaceEncoder) encodeMultiplePairs(stream *encoderStream, mi
 
 // 编码排序的键值对
 func (e mapStringInterfaceEncoder) encodeSortedPairs(stream *encoderStream, mi *reflect.MapIter, mapLen int) error {
-	sv := make([]reflectWithString, mapLen)
+	sv := getReflectWithStringSlice(mapLen)
+	defer putReflectWithStringSlice(sv)
+
+	// 确保切片有足够容量
+	if cap(sv) < mapLen {
+		sv = make([]reflectWithString, mapLen)
+	} else {
+		sv = sv[:mapLen]
+	}
 
 	for i := 0; mi.Next(); i++ {
 		ks, err := resolveKeyName(mi.Key())
@@ -105,7 +135,7 @@ func (e mapStringInterfaceEncoder) encodeSortedPairs(stream *encoderStream, mi *
 		stream.buffer = append(stream.buffer, kv.ks...)
 		stream.buffer = append(stream.buffer, '"', ':')
 
-		elemEncoder := getEncoder(kv.v.Type())
+		elemEncoder := getEncoderFast(kv.v.Type())
 		err := elemEncoder.appendToBytes(stream, kv.v)
 		if err != nil {
 			return err
@@ -132,7 +162,7 @@ func (e mapStringInterfaceEncoder) encodeUnsortedPairs(stream *encoderStream, mi
 		stream.buffer = append(stream.buffer, '"', ':')
 
 		miValue := mi.Value()
-		elemEncoder := getEncoder(miValue.Type())
+		elemEncoder := getEncoderFast(miValue.Type())
 		err = elemEncoder.appendToBytes(stream, miValue)
 		if err != nil {
 			return err
@@ -215,7 +245,15 @@ func (e mapEncoder) encodeMultiplePairs(stream *encoderStream, mi *reflect.MapIt
 
 // 编码排序的键值对
 func (e mapEncoder) encodeSortedPairs(stream *encoderStream, mi *reflect.MapIter, mapLen int) error {
-	sv := make([]reflectWithString, mapLen)
+	sv := getReflectWithStringSlice(mapLen)
+	defer putReflectWithStringSlice(sv)
+
+	// 确保切片有足够容量
+	if cap(sv) < mapLen {
+		sv = make([]reflectWithString, mapLen)
+	} else {
+		sv = sv[:mapLen]
+	}
 
 	for i := 0; mi.Next(); i++ {
 		ks, err := resolveKeyName(mi.Key())

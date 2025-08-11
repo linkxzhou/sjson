@@ -35,10 +35,38 @@ func releaseEncoderStream(stream *encoderStream) {
 	encoderStreamPool.Put(stream)
 }
 
+// 估算JSON编码所需的缓冲区大小
+func estimateJSONSize(v interface{}) int {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		return len(val) * 32 // 每个键值对估算32字节
+	case []interface{}:
+		return len(val) * 16 // 每个元素估算16字节
+	case string:
+		return len(val) + 16 // 字符串长度加上引号和转义字符
+	case map[string]string:
+		return len(val) * 24 // 字符串map较小
+	case []string:
+		return len(val) * 12 // 字符串数组
+	default:
+		return 256 // 默认大小
+	}
+}
+
+// 获取带预估大小的编码器流
+func getEncoderStreamWithSize(estimatedSize int) *encoderStream {
+	stream := encoderStreamPool.Get().(*encoderStream)
+	if cap(stream.buffer) < estimatedSize {
+		stream.buffer = make([]byte, 0, estimatedSize)
+	}
+	return stream
+}
+
 // Marshal 使用直接编码模式将Go对象编码为JSON字节切片
 func Marshal(v interface{}) ([]byte, error) {
-	// 从对象池获取编码器流
-	stream := getEncoderStream()
+	// 估算所需缓冲区大小并获取编码器流
+	estimatedSize := estimateJSONSize(v)
+	stream := getEncoderStreamWithSize(estimatedSize)
 	defer releaseEncoderStream(stream)
 
 	// 保存编码后的结果

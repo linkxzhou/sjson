@@ -76,6 +76,29 @@ func isEmptyValue(v reflect.Value) bool {
 }
 
 // 根据类型获取直接编码器
+// 快速路径编码器获取，减少反射和缓存查找开销
+func getEncoderFast(t reflect.Type) Encoder {
+	// 使用原子操作的快速路径检查常用类型
+	switch t.Kind() {
+	case reflect.String:
+		return stringEncoderInst
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return intEncoderInst
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return uintEncoderInst
+	case reflect.Bool:
+		return boolEncoderInst
+	case reflect.Float32:
+		return float32EncoderInst
+	case reflect.Float64:
+		return float64EncoderInst
+	case reflect.Interface:
+		return interfaceEncoderInst
+	default:
+		return getEncoder(t) // 回退到完整实现
+	}
+}
+
 func getEncoder(t reflect.Type) Encoder {
 	if t == nil {
 		return nullEncoder{}

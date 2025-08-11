@@ -6,16 +6,70 @@
 
 sjson 是一个高性能的 Go 语言 JSON 解析库，提供了高效的 JSON 编码和解码功能。它采用直接解码技术，无需中间 Value 对象，从而提高解析效率。
 
+## 架构
+
+```mermaid
+graph TB
+    %% 用户接口
+    API["Public API<br/>Marshal/Unmarshal"]
+    
+    %% 核心组件
+    Encoder["编码器<br/>Encoder"]
+    Decoder["解码器<br/>Decoder"]
+    Lexer["词法分析器<br/>Lexer"]
+    
+    %% 类型处理
+    subgraph "类型处理器"
+        Basic["基础类型"]
+        Struct["结构体"]
+        Map["Map"]
+        Array["数组/切片"]
+    end
+    
+    %% 性能优化
+    subgraph "性能优化"
+        Pool["对象池"]
+        Cache["缓存"]
+    end
+    
+    %% 主要数据流
+    API --> Encoder
+    API --> Decoder
+    Decoder --> Lexer
+    
+    Encoder --> Basic
+    Encoder --> Struct
+    Encoder --> Map
+    Encoder --> Array
+    
+    Decoder --> Basic
+    Decoder --> Struct
+    Decoder --> Map
+    Decoder --> Array
+    
+    %% 性能优化连接
+    Encoder -.-> Pool
+    Decoder -.-> Pool
+    Encoder -.-> Cache
+    
+    %% 样式
+    classDef api fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef core fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef type fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef perf fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class API api
+    class Encoder,Decoder,Lexer core
+    class Basic,Struct,Map,Array type
+    class Pool,Cache perf
+```
+
 ## 测试覆盖率和质量保证
 
 本项目采用严格的质量保证流程：
 
 - **自动化测试**: 支持 Go 1.20-1.24 多版本测试
 - **代码覆盖率**: 目标覆盖率 > 90%，通过 Codecov 监控
-- **代码质量**: 集成 golangci-lint 进行静态代码分析
-- **安全扫描**: 使用 Gosec 和 CodeQL 进行安全漏洞检测
-- **性能监控**: 每次提交都会运行基准测试
-- **依赖管理**: Dependabot 自动更新依赖并检查安全漏洞
 
 ### 运行测试
 
