@@ -343,6 +343,8 @@ goos: darwin
 goarch: arm64
 pkg: github.com/linkxzhou/sjson
 cpu: Apple M4 Pro
+
+===== 第一轮优化：
 BenchmarkDecoder_Generic_Sonic-14                	  787606	     14063 ns/op	 789.32 MB/s	   43942 B/op	     106 allocs/op
 BenchmarkDecoder_Generic_StdLib-14               	  199702	     57981 ns/op	 191.44 MB/s	   49464 B/op	     795 allocs/op
 BenchmarkDecoder_Generic_Sjson-14                	  287949	     41910 ns/op	 264.85 MB/s	   45661 B/op	     646 allocs/op
@@ -359,7 +361,24 @@ BenchmarkDecoder_Parallel_Binding_Sonic-14       	 6418424	      1863 ns/op	5958
 BenchmarkDecoder_Parallel_Binding_StdLib-14      	 1638642	      7290 ns/op	1522.58 MB/s	   11416 B/op	     160 allocs/op
 BenchmarkDecoder_Parallel_Binding_Sjson-14       	 2597790	      4635 ns/op	2394.96 MB/s	    9394 B/op	      81 allocs/op
 BenchmarkDecoder_Parallel_Binding_Jsoniter-14    	 5138331	      2374 ns/op	4675.40 MB/s	   10698 B/op	     145 allocs/op
-PASS
+
+===== 第二轮优化：
+BenchmarkDecoder_Generic_Sonic-14                	  720184	     14658 ns/op	 757.24 MB/s	   44954 B/op	     106 allocs/op
+BenchmarkDecoder_Generic_StdLib-14               	  210007	     56558 ns/op	 196.26 MB/s	   49464 B/op	     795 allocs/op
+BenchmarkDecoder_Generic_Sjson-14                	  321618	     37753 ns/op	 294.02 MB/s	   45664 B/op	     646 allocs/op
+BenchmarkDecoder_Generic_Jsoniter-14             	  336850	     35455 ns/op	 313.07 MB/s	   54387 B/op	    1091 allocs/op
+BenchmarkDecoder_Binding_Sonic-14                	  859162	     13959 ns/op	 795.18 MB/s	   19065 B/op	      42 allocs/op
+BenchmarkDecoder_Binding_StdLib-14               	  227982	     50666 ns/op	 219.08 MB/s	   11416 B/op	     160 allocs/op
+BenchmarkDecoder_Binding_Sjson-14                	  560068	     21202 ns/op	 523.53 MB/s	    9419 B/op	      81 allocs/op
+BenchmarkDecoder_Binding_Jsoniter-14             	  901371	     13324 ns/op	 833.07 MB/s	   10704 B/op	     145 allocs/op
+BenchmarkDecoder_Parallel_Generic_Sonic-14       	 3364812	      3554 ns/op	3123.65 MB/s	   44604 B/op	     106 allocs/op
+BenchmarkDecoder_Parallel_Generic_StdLib-14      	  587824	     20079 ns/op	 552.82 MB/s	   49467 B/op	     795 allocs/op
+BenchmarkDecoder_Parallel_Generic_Sjson-14       	  819379	     15087 ns/op	 735.73 MB/s	   45657 B/op	     646 allocs/op
+BenchmarkDecoder_Parallel_Generic_Jsoniter-14    	  507662	     23148 ns/op	 479.53 MB/s	   54404 B/op	    1091 allocs/op
+BenchmarkDecoder_Parallel_Binding_Sonic-14       	 6557863	      1845 ns/op	6015.22 MB/s	   23187 B/op	      42 allocs/op
+BenchmarkDecoder_Parallel_Binding_StdLib-14      	 1000000	     11215 ns/op	 989.73 MB/s	   11417 B/op	     160 allocs/op
+BenchmarkDecoder_Parallel_Binding_Sjson-14       	 2146012	      5661 ns/op	1960.68 MB/s	    9425 B/op	      81 allocs/op
+BenchmarkDecoder_Parallel_Binding_Jsoniter-14    	 3487276	      3519 ns/op	3154.30 MB/s	   10701 B/op	     145 allocs/op
 ```
 
 ### 2. Marshal 性能测试
@@ -369,6 +388,8 @@ goos: darwin
 goarch: arm64
 pkg: github.com/linkxzhou/sjson
 cpu: Apple M4 Pro
+
+===== 第一轮优化：
 BenchmarkEncoder_Generic_Sonic-14                	  461450	     24943 ns/op	 445.01 MB/s	   13206 B/op	      40 allocs/op
 BenchmarkEncoder_Generic_StdLib-14               	  323244	     37163 ns/op	 298.68 MB/s	   32909 B/op	     653 allocs/op
 BenchmarkEncoder_Generic_Sjson-14                	  458061	     26895 ns/op	 412.71 MB/s	   19312 B/op	     615 allocs/op
@@ -386,4 +407,6 @@ BenchmarkEncoder_Parallel_Binding_StdLib-14      	10717603	      1157 ns/op	9594
 BenchmarkEncoder_Parallel_Binding_Sjson-14       	 8119550	      1673 ns/op	6635.75 MB/s	    9474 B/op	       1 allocs/op
 BenchmarkEncoder_Parallel_Binding_Jsoniter-14    	 9656658	      1229 ns/op	9029.83 MB/s	    9481 B/op	       2 allocs/op
 PASS
+
+===== 第二轮优化：
 ```

@@ -7,11 +7,6 @@ import (
 	"sync"
 )
 
-var (
-	trueValue  = reflect.ValueOf(true)
-	falseValue = reflect.ValueOf(false)
-)
-
 // 用于缓存反射值的对象池
 var valueSlicePool = sync.Pool{
 	New: func() interface{} {
@@ -21,11 +16,21 @@ var valueSlicePool = sync.Pool{
 	},
 }
 
-// 用于缓存接口数组的对象池
+// 用于缓存接口数组的对象池 - 增大初始容量
 var interfaceSlicePool = sync.Pool{
 	New: func() interface{} {
-		s := make([]interface{}, 0, 8)
+		s := make([]interface{}, 0, 16)
 		return &s
+	},
+}
+
+// 解码器对象池
+var decoderPool = sync.Pool{
+	New: func() interface{} {
+		// 创建一个新的解码器，包含一个新的Lexer
+		return &Decoder{
+			lexer: NewLexer(nil),
+		}
 	},
 }
 
@@ -36,33 +41,39 @@ type Decoder struct {
 	config Config
 }
 
+// 重置解码器状态
+func (d *Decoder) reset(input []byte, config Config) {
+	d.lexer.Reset(input)
+	d.config = config
+	d.token = Token{}
+}
+
 // 创建新的直接解码器
 func newDecoder(input []byte, config Config) *Decoder {
-	lexer := NewLexer(input)
-	d := &Decoder{
-		lexer:  lexer,
-		config: config,
-	}
+	d := decoderPool.Get().(*Decoder)
+	d.reset(input, config)
 	d.nextToken() // 读取第一个token
 	return d
 }
 
+// 释放解码器回对象池
+func releaseDecoder(d *Decoder) {
+	d.lexer.input = nil // 避免持有大对象的引用
+	decoderPool.Put(d)
+}
+
 // 从io.Reader创建新的直接解码器
 func newDecoderFromReader(r io.Reader, config Config) (*Decoder, error) {
-	lexer, err := NewLexerFromReader(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
-
-	d := &Decoder{
-		lexer:  lexer,
-		config: config,
-	}
-	d.nextToken() // 读取第一个token
-	return d, nil
+	return newDecoder(data, config), nil
 }
 
-// 读取下一个token
+// 读取下一个token - 内联优化
+//
+//go:inline
 func (d *Decoder) nextToken() {
 	d.token = d.lexer.NextToken()
 }

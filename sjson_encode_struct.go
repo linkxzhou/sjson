@@ -7,6 +7,7 @@ import (
 // structField 表示结构体字段的缓存信息
 type structField struct {
 	name      []byte
+	keyBytes  []byte // 预计算的键字节："name":
 	index     int
 	omitempty bool
 	typ       reflect.Type
@@ -28,14 +29,6 @@ func (e *structEncoder) appendToBytes(stream *encoderStream, src reflect.Value) 
 			return nil
 		}
 		src = src.Elem()
-	}
-
-	// 预估缓冲区大小，减少重新分配
-	estimatedSize := e.estimateSize()
-	if cap(stream.buffer)-len(stream.buffer) < estimatedSize {
-		newBuf := make([]byte, len(stream.buffer), len(stream.buffer)+estimatedSize)
-		copy(newBuf, stream.buffer)
-		stream.buffer = newBuf
 	}
 
 	// 开始对象
@@ -60,17 +53,6 @@ func (e *structEncoder) appendToBytes(stream *encoderStream, src reflect.Value) 
 	}
 }
 
-// 估算编码后的大小
-func (e *structEncoder) estimateSize() int {
-	// 基础大小：{} + 字段名引号和冒号
-	size := 2
-	for _, field := range e.fields {
-		// 字段名 + 引号 + 冒号 + 逗号 + 估算值大小
-		size += len(field.name) + 4 + 20 // 20是值的估算大小
-	}
-	return size
-}
-
 // 单字段编码优化
 func (e *structEncoder) encodeSingleField(stream *encoderStream, src reflect.Value) error {
 	field := e.fields[0]
@@ -83,9 +65,7 @@ func (e *structEncoder) encodeSingleField(stream *encoderStream, src reflect.Val
 	}
 
 	// 写入字段名
-	stream.buffer = append(stream.buffer, '"')
-	stream.buffer = append(stream.buffer, field.name...)
-	stream.buffer = append(stream.buffer, '"', ':')
+	stream.buffer = append(stream.buffer, field.keyBytes...)
 
 	// 编码字段值
 	err := field.encoder.appendToBytes(stream, f)
@@ -106,9 +86,7 @@ func (e *structEncoder) encodeFieldsFast(stream *encoderStream, src reflect.Valu
 		}
 
 		// 写入字段名
-		stream.buffer = append(stream.buffer, '"')
-		stream.buffer = append(stream.buffer, field.name...)
-		stream.buffer = append(stream.buffer, '"', ':')
+		stream.buffer = append(stream.buffer, field.keyBytes...)
 
 		// 编码字段值
 		f := src.Field(field.index)
@@ -141,9 +119,7 @@ func (e *structEncoder) encodeFieldsWithOmitEmpty(stream *encoderStream, src ref
 		firstField = false
 
 		// 写入字段名
-		stream.buffer = append(stream.buffer, '"')
-		stream.buffer = append(stream.buffer, field.name...)
-		stream.buffer = append(stream.buffer, '"', ':')
+		stream.buffer = append(stream.buffer, field.keyBytes...)
 
 		// 编码字段值
 		err := field.encoder.appendToBytes(stream, f)

@@ -77,28 +77,20 @@ func escapeStringToBytes(buf []byte, c byte) []byte {
 type stringEncoder struct{}
 
 // 为stringEncoder添加appendToBytes方法
+//
 //go:inline
 func (e stringEncoder) appendToBytes(stream *encoderStream, src reflect.Value) error {
-	s := src.String()
+	return encodeStringDirect(stream, src.String())
+}
 
+// encodeStringDirect 直接编码字符串，避免反射
+//
+//go:inline
+func encodeStringDirect(stream *encoderStream, s string) error {
 	if s == "" {
 		stream.buffer = append(stream.buffer, emptyString...)
 		return nil
 	}
-
-	// 预分配足够的空间，减少重新分配
-	needed := len(s) + 2 // 至少需要字符串长度+2个引号
-	if cap(stream.buffer)-len(stream.buffer) < needed {
-		newCap := cap(stream.buffer) * 2
-		if newCap < len(stream.buffer)+needed {
-			newCap = len(stream.buffer) + needed
-		}
-		newBuf := make([]byte, len(stream.buffer), newCap)
-		copy(newBuf, stream.buffer)
-		stream.buffer = newBuf
-	}
-
-	stream.buffer = append(stream.buffer, '"')
 
 	// 快速路径：检查是否需要转义
 	needsEscape := false
@@ -111,35 +103,52 @@ func (e stringEncoder) appendToBytes(stream *encoderStream, src reflect.Value) e
 
 	if !needsEscape {
 		// 无需转义，直接添加
+		stream.buffer = append(stream.buffer, '"')
 		stream.buffer = append(stream.buffer, s...)
-	} else {
-		// 需要转义，单次循环处理
-		start := 0
-		for i := 0; i < len(s); {
-			if c := s[i]; c < utf8.RuneSelf {
-				if !safeSet[c] {
-					// 需要转义的字符
-					if start < i {
-						stream.buffer = append(stream.buffer, s[start:i]...)
-					}
-					stream.buffer = escapeStringToBytes(stream.buffer, c)
-					i++
-					start = i
-				} else {
-					// 安全字符，继续
-					i++
-				}
-			} else {
-				// 处理非ASCII字符（UTF-8）
-				_, size := utf8.DecodeRuneInString(s[i:])
-				i += size
-			}
-		}
+		stream.buffer = append(stream.buffer, '"')
+		return nil
+	}
 
-		// 添加剩余部分
-		if start < len(s) {
-			stream.buffer = append(stream.buffer, s[start:]...)
+	// 需要转义，预分配足够的空间
+	needed := len(s) + 2
+	if cap(stream.buffer)-len(stream.buffer) < needed*2 {
+		newCap := cap(stream.buffer) * 2
+		if newCap < len(stream.buffer)+needed*2 {
+			newCap = len(stream.buffer) + needed*2
 		}
+		newBuf := make([]byte, len(stream.buffer), newCap)
+		copy(newBuf, stream.buffer)
+		stream.buffer = newBuf
+	}
+
+	stream.buffer = append(stream.buffer, '"')
+
+	// 需要转义，单次循环处理
+	start := 0
+	for i := 0; i < len(s); {
+		if c := s[i]; c < utf8.RuneSelf {
+			if !safeSet[c] {
+				// 需要转义的字符
+				if start < i {
+					stream.buffer = append(stream.buffer, s[start:i]...)
+				}
+				stream.buffer = escapeStringToBytes(stream.buffer, c)
+				i++
+				start = i
+			} else {
+				// 安全字符，继续
+				i++
+			}
+		} else {
+			// 处理非ASCII字符（UTF-8）
+			_, size := utf8.DecodeRuneInString(s[i:])
+			i += size
+		}
+	}
+
+	// 添加剩余部分
+	if start < len(s) {
+		stream.buffer = append(stream.buffer, s[start:]...)
 	}
 
 	stream.buffer = append(stream.buffer, '"')

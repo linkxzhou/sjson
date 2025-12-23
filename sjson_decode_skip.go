@@ -7,7 +7,7 @@ import (
 // 跳过一个JSON值
 func (d *Decoder) skipValue() error {
 	switch d.token.Type {
-	case NullToken, TrueToken, FalseToken, NumberToken, StringToken:
+	case NullToken, TrueToken, FalseToken, IntegerToken, FloatToken, StringToken:
 		// 简单值，直接跳过
 		d.nextToken()
 		return nil
@@ -25,7 +25,7 @@ func (d *Decoder) skipValue() error {
 	}
 }
 
-// 跳过对象
+// 跳过对象 - 优化版本，使用深度计数而非递归
 func (d *Decoder) skipObject() error {
 	// 跳过左大括号
 	d.nextToken()
@@ -36,40 +36,53 @@ func (d *Decoder) skipObject() error {
 		return nil
 	}
 
-	// 跳过所有键值对
-	for {
-		// 跳过键
-		if d.token.Type != StringToken {
-			return fmt.Errorf("对象键必须是字符串，得到: %v", d.token)
-		}
-		d.nextToken()
+	// 使用深度计数来跳过嵌套结构
+	depth := 1
 
-		// 跳过冒号
-		if d.token.Type != ColonToken {
-			return fmt.Errorf("对象键后面必须是冒号，得到: %v", d.token)
-		}
-		d.nextToken()
+	for depth > 0 {
+		switch d.token.Type {
+		case EOFToken:
+			return fmt.Errorf("对象未正确闭合")
 
-		// 跳过值
-		if err := d.skipValue(); err != nil {
-			return err
-		}
-
-		// 检查分隔符
-		if d.token.Type == CommaToken {
+		case LeftBraceToken:
+			depth++
 			d.nextToken()
-		} else if d.token.Type == RightBraceToken {
+
+		case RightBraceToken:
+			depth--
 			d.nextToken()
-			break
-		} else {
-			return fmt.Errorf("对象中意外的标记: %v", d.token)
+			if depth == 0 {
+				return nil
+			}
+
+		case LeftBracketToken:
+			// 进入数组，需要追踪数组深度
+			d.nextToken()
+			arrayDepth := 1
+			for arrayDepth > 0 && d.token.Type != EOFToken {
+				switch d.token.Type {
+				case LeftBracketToken:
+					arrayDepth++
+				case RightBracketToken:
+					arrayDepth--
+				case LeftBraceToken:
+					// 数组中的对象，增加对象深度
+					depth++
+					d.nextToken()
+					continue
+				}
+				d.nextToken()
+			}
+
+		default:
+			d.nextToken()
 		}
 	}
 
 	return nil
 }
 
-// 跳过数组
+// 跳过数组 - 优化版本
 func (d *Decoder) skipArray() error {
 	// 跳过左方括号
 	d.nextToken()
@@ -80,21 +93,46 @@ func (d *Decoder) skipArray() error {
 		return nil
 	}
 
-	// 跳过所有元素
-	for {
-		// 跳过值
-		if err := d.skipValue(); err != nil {
-			return err
-		}
+	// 使用深度计数
+	depth := 1
 
-		// 检查分隔符
-		if d.token.Type == CommaToken {
+	for depth > 0 {
+		switch d.token.Type {
+		case EOFToken:
+			return fmt.Errorf("数组未正确闭合")
+
+		case LeftBracketToken:
+			depth++
 			d.nextToken()
-		} else if d.token.Type == RightBracketToken {
+
+		case RightBracketToken:
+			depth--
 			d.nextToken()
-			break
-		} else {
-			return fmt.Errorf("数组中意外的标记: %v", d.token)
+			if depth == 0 {
+				return nil
+			}
+
+		case LeftBraceToken:
+			// 进入对象，需要追踪对象深度
+			d.nextToken()
+			objDepth := 1
+			for objDepth > 0 && d.token.Type != EOFToken {
+				switch d.token.Type {
+				case LeftBraceToken:
+					objDepth++
+				case RightBraceToken:
+					objDepth--
+				case LeftBracketToken:
+					// 对象中的数组，增加数组深度
+					depth++
+					d.nextToken()
+					continue
+				}
+				d.nextToken()
+			}
+
+		default:
+			d.nextToken()
 		}
 	}
 

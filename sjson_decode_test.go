@@ -226,7 +226,7 @@ func BenchmarkVsOldUnmarshal(b *testing.B) {
 func BenchmarkUnmarshalCompareTypes(b *testing.B) {
 	// 测试简单数据类型
 	simpleJSON := []byte(`123`)
-	b.Run("Simple", func(b *testing.B) {
+	b.Run("SjsonSimple", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var result interface{}
@@ -252,7 +252,7 @@ func BenchmarkUnmarshalCompareTypes(b *testing.B) {
 
 	// 测试小对象
 	smallObjJSON := []byte(`{"name":"张三","age":30}`)
-	b.Run("SmallObject", func(b *testing.B) {
+	b.Run("SjsonSmallObject", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var result map[string]interface{}
@@ -278,7 +278,7 @@ func BenchmarkUnmarshalCompareTypes(b *testing.B) {
 
 	// 测试数组
 	arrayJSON := []byte(`[1,2,3,4,5,6,7,8,9,10]`)
-	b.Run("Array", func(b *testing.B) {
+	b.Run("SjsonArray", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var result []interface{}
@@ -316,7 +316,7 @@ func BenchmarkUnmarshalCompareTypes(b *testing.B) {
 			{"type": "phone", "value": "123456789"}
 		]
 	}`)
-	b.Run("NestedObject", func(b *testing.B) {
+	b.Run("SjsonNestedObject", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var result map[string]interface{}

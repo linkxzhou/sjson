@@ -35,6 +35,37 @@ BenchmarkLexerStringEscapes-14      	55456996	       217.9 ns/op	     128 B/op	 
 BenchmarkLexerAllTokens-14          	 8792521	      1359 ns/op	     832 B/op	      25 allocs/op
 BenchmarkLexerBatchProcessing/单个标记处理-14                     	 8836092	      1373 ns/op	     832 B/op	      25 allocs/op
 BenchmarkLexerBatchProcessing/批量标记处理-14                     	 4523031	      2782 ns/op	   10154 B/op	      33 allocs/op
+
+第七轮：通过优化批处理字符，提升性能
+BenchmarkLexerSimple-14             	56454957	       202.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerComplex-14            	16104240	       746.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerStringEscapes-14      	64603134	       181.3 ns/op	      48 B/op	       1 allocs/op
+BenchmarkLexerAllTokens-14          	10290522	      1160 ns/op	      64 B/op	       2 allocs/op
+BenchmarkLexerBatchProcessing/单个标记处理-14                     	10088590	      1161 ns/op	      64 B/op	       2 allocs/o
+
+第八轮：数字变成边解析，边计算
+BenchmarkLexerSimple-14             	51313683	       226.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerComplex-14            	14934674	       805.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerStringEscapes-14      	64099182	       185.5 ns/op	      48 B/op	       1 allocs/op
+BenchmarkLexerAllTokens-14          	 9388269	      1280 ns/op	      64 B/op	       2 allocs/op
+BenchmarkLexerBatchProcessing/单个标记处理-14                     	 9565615	      1259 ns/op	      64 B/op	       2 allocs/op
+BenchmarkLexerNumbers/整数数组-14                               	38682402	       312.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerNumbers/浮点数数组-14                              	53380238	       224.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerNumbers/科学计数法数组-14                            	66874828	       178.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerNumbers/混合数字JSON-14                           	53085345	       224.6 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerNumbers/大数字数组-14                              	36372564	       338.4 ns/op	       0 B/op	       0 allocs/op
+
+第九轮：优化批量处理字符，提升性能
+BenchmarkLexerSimple-14             	50412788	       227.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerComplex-14            	14702334	       819.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerStringEscapes-14      	63784083	       189.4 ns/op	      48 B/op	       1 allocs/op
+BenchmarkLexerAllTokens-14          	 9191877	      1300 ns/op	      64 B/op	       2 allocs/op
+BenchmarkLexerBatchProcessing/单个标记处理-14                     	 9348117	      1287 ns/op	      64 B/op	       2 allocs/op
+BenchmarkLexerNumbers/整数数组-14                               	38522527	       314.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerNumbers/浮点数数组-14                              	51098874	       230.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerNumbers/科学计数法数组-14                            	66693390	       179.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerNumbers/混合数字JSON-14                           	53580975	       224.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerNumbers/大数字数组-14                              	36534277	       330.5 ns/op	       0 B/op	       0 allocs/op
 ```
 
 ## 2. parser.go性能优化
@@ -126,6 +157,14 @@ BenchmarkCompareMedium/JsoniterMarshal-14      	51075765	       238.1 ns/op	    
 BenchmarkCompareMedium/SjsonUnmarshal-14       	 1948396	      5828 ns/op	    5924 B/op	     115 allocs/op
 BenchmarkCompareMedium/StdUnmarshal-14         	 1469923	      8227 ns/op	     504 B/op	      11 allocs/op
 BenchmarkCompareMedium/JsoniterUnmarshal-14    	 5809028	      2028 ns/op	     384 B/op	      41 allocs/op
+
+第九轮：通过AI优化部分代码
+BenchmarkCompareMedium/SjsonMarshal-14         	45039204	       260.1 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/StdMarshal-14           	49513826	       244.3 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/JsoniterMarshal-14      	48162411	       240.1 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/SjsonUnmarshal-14       	 3365167	      3371 ns/op	      56 B/op	       4 allocs/op
+BenchmarkCompareMedium/StdUnmarshal-14         	 1474742	      8185 ns/op	     504 B/op	      11 allocs/op
+BenchmarkCompareMedium/JsoniterUnmarshal-14    	 5992104	      2013 ns/op	     352 B/op	      38 allocs/op
 ```
 
 ## 4. 与其他 JSON 库的性能对比
@@ -155,17 +194,90 @@ BenchmarkCompareMedium/JsoniterMarshal-14      	52111992	       229.6 ns/op	    
 BenchmarkCompareMedium/SjsonUnmarshal-14       	 2724361	      4396 ns/op	     168 B/op	       6 allocs/op
 BenchmarkCompareMedium/StdUnmarshal-14         	 1499334	      7980 ns/op	     504 B/op	      11 allocs/op
 BenchmarkCompareMedium/JsoniterUnmarshal-14    	 6126705	      1995 ns/op	     352 B/op	      38 allocs/op
+
+第四轮：通过优化批处理字符，提升性能
+BenchmarkCompareMedium/SjsonMarshal-14         	44268858	       260.8 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/StdMarshal-14           	49737135	       241.8 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/JsoniterMarshal-14      	51249481	       233.8 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/SjsonUnmarshal-14       	 3782358	      3163 ns/op	     184 B/op	       6 allocs/op
+BenchmarkCompareMedium/StdUnmarshal-14         	 1499564	      8006 ns/op	     504 B/op	      11 allocs/op
+BenchmarkCompareMedium/JsoniterUnmarshal-14    	 6064633	      1993 ns/op	     352 B/op	      38 allocs/op
+
+第五轮：
+BenchmarkCompareMedium/SjsonMarshal-14         	45357094	       256.8 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/StdMarshal-14           	51099282	       232.7 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/JsoniterMarshal-14      	52408927	       231.9 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/SjsonUnmarshal-14       	 3605248	      3333 ns/op	     184 B/op	       6 allocs/op
+BenchmarkCompareMedium/StdUnmarshal-14         	 1457959	      8262 ns/op	     504 B/op	      11 allocs/op
+BenchmarkCompareMedium/JsoniterUnmarshal-14    	 6119193	      1993 ns/op	     352 B/op	      38 allocs/op
+
+第六轮：
+BenchmarkCompareMedium/SjsonMarshal-14         	43727647	       266.9 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/StdMarshal-14           	49850068	       243.0 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/JsoniterMarshal-14      	51074415	       237.3 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/SjsonUnmarshal-14       	 3565106	      3364 ns/op	      56 B/op	       4 allocs/op
+BenchmarkCompareMedium/StdUnmarshal-14         	 1481877	      8174 ns/op	     504 B/op	      11 allocs/op
+BenchmarkCompareMedium/JsoniterUnmarshal-14    	 5954317	      1999 ns/op	     352 B/op	      38 allocs/op
+
+第七轮：
+BenchmarkCompareMedium/SjsonMarshal-14         	43213803	       258.1 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/StdMarshal-14           	46319899	       241.5 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/JsoniterMarshal-14      	51207300	       237.5 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/SjsonUnmarshal-14       	 3606482	      3338 ns/op	      56 B/op	       4 allocs/op
+BenchmarkCompareMedium/StdUnmarshal-14         	 1486693	      8076 ns/op	     504 B/op	      11 allocs/op
+BenchmarkCompareMedium/JsoniterUnmarshal-14    	 5898898	      2015 ns/op	     352 B/op	      38 allocs/op
 ```
 
 ## 5. byte_utils.go 和 strconv 对比
 测试命令：go test -bench=BenchmarkParseIntComparison -benchmem -benchtime=10s -cpuprofile=cpu.prof -memprofile=mem.prof
 ```
+第一轮：
 BenchmarkParseIntComparison/parseIntFromBytes-14         	984710859	        12.35 ns/op	       0 B/op	       0 allocs/op
 BenchmarkParseIntComparison/strconv.ParseInt-14          	651232766	        19.15 ns/op	       0 B/op	       0 allocs/op
+
+第二轮：
+BenchmarkParseIntComparison/parseIntFromBytes-14         	1000000000	        10.58 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParseIntComparison/strconv.ParseInt-14          	669233580	        18.44 ns/op	       0 B/op	       0 allocs/op
 ```
 
 测试命令：go test -bench=BenchmarkParseFloatComparison -benchmem -benchtime=10s -cpuprofile=cpu.prof -memprofile=mem.prof
 ```
+第一轮：
 BenchmarkParseFloatComparison/parseFloatFromBytes-14         	886025876	        13.81 ns/op	       0 B/op	       0 allocs/op
 BenchmarkParseFloatComparison/strconv.ParseFloat-14          	414038884	        28.85 ns/op	       0 B/op	       0 allocs/op
+
+第二轮：
+BenchmarkParseFloatComparison/parseFloatFromBytes-14         	875253253	        13.65 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParseFloatComparison/strconv.ParseFloat-14          	411500371	        29.24 ns/op	       0 B/op	       0 allocs/op
+```
+
+## 6. 基础类型测试（Unmarshal）
+测试命令：go test -bench=BenchmarkUnmarshalCompareTypes -benchmem -benchtime=10s -cpuprofile=cpu.prof -memprofile=mem.prof
+```
+第一轮：
+BenchmarkUnmarshalCompareTypes/SjsonSimple-14         	158461738	        76.33 ns/op	     152 B/op	       4 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibSimple-14        	100000000	       106.5 ns/op	     176 B/op	       4 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterSimple-14      	152543209	        79.51 ns/op	      40 B/op	       3 allocs/op
+BenchmarkUnmarshalCompareTypes/SjsonSmallObject-14    	41844195	       275.4 ns/op	     528 B/op	       9 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibSmallObject-14   	28938656	       423.0 ns/op	     592 B/op	      14 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterSmallObject-14 	52475264	       229.4 ns/op	     464 B/op	      13 allocs/op
+BenchmarkUnmarshalCompareTypes/SjsonArray-14          	17696457	       677.7 ns/op	     576 B/op	      25 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibArray-14         	16503360	       737.2 ns/op	     760 B/op	      19 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterArray-14       	39145146	       311.2 ns/op	     600 B/op	      16 allocs/op
+BenchmarkUnmarshalCompareTypes/SjsonNestedObject-14   	 9033030	      1297 ns/op	    1849 B/op	      34 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibNestedObject-14  	 6700564	      1817 ns/op	    1984 B/op	      50 allocs/op
+
+第二轮：
+BenchmarkUnmarshalCompareTypes/SjsonSimple-14         	154179160	        77.03 ns/op	     152 B/op	       4 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibSimple-14        	100000000	       106.8 ns/op	     176 B/op	       4 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterSimple-14      	152058442	        79.67 ns/op	      40 B/op	       3 allocs/op
+BenchmarkUnmarshalCompareTypes/SjsonSmallObject-14    	44412176	       276.6 ns/op	     528 B/op	       9 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibSmallObject-14   	28995601	       421.0 ns/op	     592 B/op	      14 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterSmallObject-14 	50032903	       232.6 ns/op	     464 B/op	      13 allocs/op
+BenchmarkUnmarshalCompareTypes/SjsonArray-14          	15086506	       796.4 ns/op	     896 B/op	      27 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibArray-14         	15628522	       735.1 ns/op	     760 B/op	      19 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterArray-14       	38158299	       321.1 ns/op	     600 B/op	      16 allocs/op
+BenchmarkUnmarshalCompareTypes/SjsonNestedObject-14   	 9108824	      1353 ns/op	    1849 B/op	      34 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibNestedObject-14  	 6704002	      1813 ns/op	    1984 B/op	      50 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterNestedObject-14         	10573021	      1152 ns/op	    1977 B/op	      58 allocs/op
 ```

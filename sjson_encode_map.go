@@ -49,14 +49,6 @@ func (e mapStringInterfaceEncoder) appendToBytes(stream *encoderStream, src refl
 		return nil
 	}
 
-	// 预估缓冲区大小：每个键值对大约需要20字节（键名+引号+冒号+值+逗号）
-	estimatedSize := mapLen * 20
-	if cap(stream.buffer)-len(stream.buffer) < estimatedSize {
-		newBuffer := make([]byte, len(stream.buffer), len(stream.buffer)+estimatedSize)
-		copy(newBuffer, stream.buffer)
-		stream.buffer = newBuffer
-	}
-
 	// 开始构建JSON对象
 	stream.buffer = append(stream.buffer, '{')
 
@@ -84,10 +76,171 @@ func (e mapStringInterfaceEncoder) encodeSinglePair(stream *encoderStream, mi *r
 	stream.buffer = append(stream.buffer, '"', ':')
 
 	miValue := mi.Value()
-	elemEncoder := getEncoderFast(miValue.Type())
-	err = elemEncoder.appendToBytes(stream, miValue)
-	if err != nil {
+
+	// 快速路径：直接处理常见interface{}内部类型
+	if err := encodeInterfaceValueFast(stream, miValue); err != nil {
 		return err
+	}
+
+	stream.buffer = append(stream.buffer, '}')
+	return nil
+}
+
+// encodeInterfaceValueFast 快速编码interface{}值
+func encodeInterfaceValueFast(stream *encoderStream, v reflect.Value) error {
+	if v.IsNil() {
+		stream.buffer = append(stream.buffer, nullString...)
+		return nil
+	}
+
+	elem := v.Elem()
+	switch elem.Kind() {
+	case reflect.String:
+		return encodeStringDirect(stream, elem.String())
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		stream.buffer = appendInt(stream.buffer, elem.Int(), 10)
+		return nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		stream.buffer = appendUint(stream.buffer, elem.Uint(), 10)
+		return nil
+	case reflect.Float64:
+		return appendFloat64(stream, elem.Float())
+	case reflect.Float32:
+		return appendFloat32(stream, float32(elem.Float()))
+	case reflect.Bool:
+		if elem.Bool() {
+			stream.buffer = append(stream.buffer, trueString...)
+		} else {
+			stream.buffer = append(stream.buffer, falseString...)
+		}
+		return nil
+	case reflect.Slice:
+		if elem.IsNil() {
+			stream.buffer = append(stream.buffer, nullString...)
+			return nil
+		}
+		// 检查是否是 []interface{}
+		if elem.Type().Elem().Kind() == reflect.Interface {
+			return encodeInterfaceSliceFast(stream, elem)
+		}
+		// 检查是否是 []string
+		if elem.Type().Elem().Kind() == reflect.String {
+			return encodeStringSliceFast(stream, elem)
+		}
+		// 检查是否是 []int
+		if elem.Type().Elem().Kind() == reflect.Int {
+			return encodeIntSliceFast(stream, elem)
+		}
+	case reflect.Map:
+		if elem.IsNil() {
+			stream.buffer = append(stream.buffer, nullString...)
+			return nil
+		}
+		// 检查是否是 map[string]interface{}
+		if elem.Type().Key().Kind() == reflect.String && elem.Type().Elem().Kind() == reflect.Interface {
+			return encodeMapStringInterfaceFast(stream, elem)
+		}
+	}
+
+	// 回退到通用编码器
+	elemEncoder := getEncoderFast(elem.Type())
+	return elemEncoder.appendToBytes(stream, elem)
+}
+
+// encodeInterfaceSliceFast 快速编码 []interface{}
+func encodeInterfaceSliceFast(stream *encoderStream, src reflect.Value) error {
+	length := src.Len()
+	if length == 0 {
+		stream.buffer = append(stream.buffer, emptyArray...)
+		return nil
+	}
+
+	stream.buffer = append(stream.buffer, '[')
+
+	for i := 0; i < length; i++ {
+		if i > 0 {
+			stream.buffer = append(stream.buffer, ',')
+		}
+		if err := encodeInterfaceValueFast(stream, src.Index(i)); err != nil {
+			return err
+		}
+	}
+
+	stream.buffer = append(stream.buffer, ']')
+	return nil
+}
+
+// encodeStringSliceFast 快速编码 []string
+func encodeStringSliceFast(stream *encoderStream, src reflect.Value) error {
+	length := src.Len()
+	if length == 0 {
+		stream.buffer = append(stream.buffer, emptyArray...)
+		return nil
+	}
+
+	stream.buffer = append(stream.buffer, '[')
+
+	for i := 0; i < length; i++ {
+		if i > 0 {
+			stream.buffer = append(stream.buffer, ',')
+		}
+		if err := encodeStringDirect(stream, src.Index(i).String()); err != nil {
+			return err
+		}
+	}
+
+	stream.buffer = append(stream.buffer, ']')
+	return nil
+}
+
+// encodeIntSliceFast 快速编码 []int
+func encodeIntSliceFast(stream *encoderStream, src reflect.Value) error {
+	length := src.Len()
+	if length == 0 {
+		stream.buffer = append(stream.buffer, emptyArray...)
+		return nil
+	}
+
+	stream.buffer = append(stream.buffer, '[')
+
+	for i := 0; i < length; i++ {
+		if i > 0 {
+			stream.buffer = append(stream.buffer, ',')
+		}
+		stream.buffer = appendInt(stream.buffer, src.Index(i).Int(), 10)
+	}
+
+	stream.buffer = append(stream.buffer, ']')
+	return nil
+}
+
+// encodeMapStringInterfaceFast 快速编码 map[string]interface{}
+func encodeMapStringInterfaceFast(stream *encoderStream, src reflect.Value) error {
+	mapLen := src.Len()
+	if mapLen == 0 {
+		stream.buffer = append(stream.buffer, emptyObject...)
+		return nil
+	}
+
+	stream.buffer = append(stream.buffer, '{')
+
+	mi := src.MapRange()
+	first := true
+	for mi.Next() {
+		if !first {
+			stream.buffer = append(stream.buffer, ',')
+		}
+		first = false
+
+		// 编码键
+		stream.buffer = append(stream.buffer, '"')
+		stream.buffer = append(stream.buffer, mi.Key().String()...)
+		stream.buffer = append(stream.buffer, '"', ':')
+
+		// 编码值
+		if err := encodeInterfaceValueFast(stream, mi.Value()); err != nil {
+			return err
+		}
 	}
 
 	stream.buffer = append(stream.buffer, '}')
@@ -135,9 +288,7 @@ func (e mapStringInterfaceEncoder) encodeSortedPairs(stream *encoderStream, mi *
 		stream.buffer = append(stream.buffer, kv.ks...)
 		stream.buffer = append(stream.buffer, '"', ':')
 
-		elemEncoder := getEncoderFast(kv.v.Type())
-		err := elemEncoder.appendToBytes(stream, kv.v)
-		if err != nil {
+		if err := encodeInterfaceValueFast(stream, kv.v); err != nil {
 			return err
 		}
 	}
@@ -161,10 +312,7 @@ func (e mapStringInterfaceEncoder) encodeUnsortedPairs(stream *encoderStream, mi
 		stream.buffer = append(stream.buffer, ks...)
 		stream.buffer = append(stream.buffer, '"', ':')
 
-		miValue := mi.Value()
-		elemEncoder := getEncoderFast(miValue.Type())
-		err = elemEncoder.appendToBytes(stream, miValue)
-		if err != nil {
+		if err := encodeInterfaceValueFast(stream, mi.Value()); err != nil {
 			return err
 		}
 	}
@@ -190,14 +338,6 @@ func (e mapEncoder) appendToBytes(stream *encoderStream, src reflect.Value) erro
 	if mapLen == 0 {
 		stream.buffer = append(stream.buffer, emptyObject...)
 		return nil
-	}
-
-	// 预估缓冲区大小
-	estimatedSize := mapLen * 20
-	if cap(stream.buffer)-len(stream.buffer) < estimatedSize {
-		newBuffer := make([]byte, len(stream.buffer), len(stream.buffer)+estimatedSize)
-		copy(newBuffer, stream.buffer)
-		stream.buffer = newBuffer
 	}
 
 	// 开始构建JSON对象

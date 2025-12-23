@@ -38,68 +38,20 @@ func TestParseIntFromBytes(t *testing.T) {
 		{"空输入", []byte(""), 10, 64, 0, true},
 		{"非数字字符", []byte("12a34"), 10, 64, 0, true},
 		{"仅符号", []byte("-"), 10, 64, 0, true},
-		{"超出范围", []byte("9223372036854775808"), 10, 64, math.MinInt64, false}, // 溢出处理实际返回最小值
+		{"正数溢出", []byte("9223372036854775808"), 10, 64, math.MaxInt64, false},  // 正数溢出返回最大值
+		{"负数溢出", []byte("-9223372036854775809"), 10, 64, math.MinInt64, false}, // 负数溢出返回最小值
 		{"32位溢出", []byte("2147483648"), 10, 32, 0, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseIntFromBytes(tt.input, tt.base, tt.bitSize)
+			got, _, err := parseIntFromBytes(tt.input, tt.base, tt.bitSize)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseIntFromBytes() 错误 = %v, 期望错误 = %v", err, tt.wantErr)
 				return
 			}
 			if err == nil && got != tt.want {
 				t.Errorf("parseIntFromBytes() = %v, 期望 %v", got, tt.want)
-			}
-		})
-	}
-}
-
-// 测试从字节切片解析无符号整数
-func TestParseUintFromBytes(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   []byte
-		base    int
-		bitSize int
-		want    uint64
-		wantErr bool
-	}{
-		// 基本测试
-		{"零值", []byte("0"), 10, 64, 0, false},
-		{"正整数", []byte("123"), 10, 64, 123, false},
-		{"带加号", []byte("+123"), 10, 64, 123, false},
-		{"最大值", []byte("18446744073709551615"), 10, 64, math.MaxUint64, false},
-
-		// 不同进制测试
-		{"十六进制", []byte("FF"), 16, 64, 255, false},
-		{"二进制", []byte("1111"), 2, 64, 15, false},
-		{"八进制", []byte("77"), 8, 64, 63, false},
-
-		// 不同位宽测试
-		{"32位无符号", []byte("4294967295"), 10, 32, math.MaxUint32, false},
-		{"16位无符号", []byte("65535"), 10, 16, math.MaxUint16, false},
-		{"8位无符号", []byte("255"), 10, 8, math.MaxUint8, false},
-
-		// 错误测试
-		{"空输入", []byte(""), 10, 64, 0, true},
-		{"负数", []byte("-1"), 10, 64, 0, true},
-		{"非数字字符", []byte("12a34"), 10, 64, 0, true},
-		{"仅符号", []byte("+"), 10, 64, 0, true},
-		{"超出范围", []byte("18446744073709551616"), 10, 64, 0, false}, // 溢出处理实际返回0
-		{"32位溢出", []byte("4294967296"), 10, 32, 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseUintFromBytes(tt.input, tt.base, tt.bitSize)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("parseUintFromBytes() 错误 = %v, 期望错误 = %v", err, tt.wantErr)
-				return
-			}
-			if err == nil && got != tt.want {
-				t.Errorf("parseUintFromBytes() = %v, 期望 %v", got, tt.want)
 			}
 		})
 	}
@@ -145,7 +97,7 @@ func TestParseFloatFromBytes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseFloatFromBytes(tt.input, tt.bitSize)
+			got, _, _, err := parseFloatFromBytes(tt.input, tt.bitSize)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseFloatFromBytes() 错误 = %v, 期望错误 = %v", err, tt.wantErr)
 				return
@@ -202,15 +154,7 @@ func BenchmarkParseIntFromBytes(b *testing.B) {
 	input := []byte("9223372036854775807")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = parseIntFromBytes(input, 10, 64)
-	}
-}
-
-func BenchmarkParseUintFromBytes(b *testing.B) {
-	input := []byte("18446744073709551615")
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = parseUintFromBytes(input, 10, 64)
+		_, _, _ = parseIntFromBytes(input, 10, 64)
 	}
 }
 
@@ -218,7 +162,7 @@ func BenchmarkParseFloatFromBytes(b *testing.B) {
 	input := []byte("3.14159265358979323846")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = parseFloatFromBytes(input, 64)
+		_, _, _, _ = parseFloatFromBytes(input, 64)
 	}
 }
 
@@ -230,7 +174,7 @@ func BenchmarkParseIntComparison(b *testing.B) {
 	b.Run("parseIntFromBytes", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, _ = parseIntFromBytes(input, 10, 64)
+			_, _, _ = parseIntFromBytes(input, 10, 64)
 		}
 	})
 
@@ -249,7 +193,7 @@ func BenchmarkParseFloatComparison(b *testing.B) {
 	b.Run("parseFloatFromBytes", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, _ = parseFloatFromBytes(input, 64)
+			_, _, _, _ = parseFloatFromBytes(input, 64)
 		}
 	})
 

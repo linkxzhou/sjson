@@ -27,10 +27,7 @@ func (d *Decoder) decodeObject(dst reflect.Value) error {
 
 		case reflect.Interface:
 			if dst.NumMethod() == 0 {
-				m := make(map[string]interface{}, 0)
-				emptyMapValue := reflect.ValueOf(m)
-
-				dst.Set(emptyMapValue)
+				dst.Set(reflect.ValueOf(map[string]interface{}{}))
 				return nil
 			}
 		}
@@ -46,16 +43,15 @@ func (d *Decoder) decodeObject(dst reflect.Value) error {
 		return d.decodeStruct(dst)
 	case reflect.Interface:
 		if dst.NumMethod() == 0 {
-			m := make(map[string]interface{}, 0)
-			emptyMapValue := reflect.ValueOf(m)
+			m := make(map[string]interface{}, 8)
 
 			// 解码到这个map
-			if err := d.decodeMap(emptyMapValue); err != nil {
+			if err := d.decodeMapStringInterface(m); err != nil {
 				return err
 			}
 
 			// 设置到接口值
-			dst.Set(emptyMapValue)
+			dst.Set(reflect.ValueOf(m))
 			return nil
 		}
 	}
@@ -74,23 +70,15 @@ func (d *Decoder) decodeObject(dst reflect.Value) error {
 	return fmt.Errorf("无法将对象解码到 %s 类型", dst.Type())
 }
 
-// 解码Map
-func (d *Decoder) decodeMap(dst reflect.Value) error {
-	if dst.IsNil() {
-		dst.Set(reflect.MakeMap(dst.Type()))
-	}
-
-	elemType := dst.Type().Elem()
-	// 优化：对 map[string]interface{} 特殊处理
-	mapInterface, isInterface := dst.Interface().(map[string]interface{})
-
+// decodeMapStringInterface 快速解码 map[string]interface{}
+func (d *Decoder) decodeMapStringInterface(m map[string]interface{}) error {
 	for {
 		// 键必须是字符串
 		if d.token.Type != StringToken {
 			return fmt.Errorf("对象键必须是字符串，得到: %v", d.token)
 		}
 
-		key := d.token.Value
+		key := bytesToString(d.token.Value)
 		d.nextToken()
 
 		// 键后面必须是冒号
@@ -99,24 +87,70 @@ func (d *Decoder) decodeMap(dst reflect.Value) error {
 		}
 		d.nextToken()
 
-		// 设置键值对，确保键是字符串类型
-		if isInterface {
-			var valueElem interface{}
-			if err := d.decodeValue(reflect.ValueOf(&valueElem).Elem()); err != nil {
-				return err
-			}
-
-			mapInterface[bytesToString(key)] = valueElem
-		} else {
-			// 解码值
-			valueElem := reflect.New(elemType).Elem()
-			if err := d.decodeValue(valueElem); err != nil {
-				return err
-			}
-
-			keyElem := reflect.ValueOf(bytesToString(key))
-			dst.SetMapIndex(keyElem, valueElem)
+		// 直接解码值
+		var value interface{}
+		if err := d.decodeValueDirect(&value); err != nil {
+			return err
 		}
+		m[key] = value
+
+		// 检查分隔符
+		if d.token.Type == CommaToken {
+			d.nextToken()
+		} else if d.token.Type == RightBraceToken {
+			d.nextToken()
+			break
+		} else {
+			return fmt.Errorf("对象中意外的标记: %v", d.token)
+		}
+	}
+
+	return nil
+}
+
+// 解码Map
+func (d *Decoder) decodeMap(dst reflect.Value) error {
+	if dst.IsNil() {
+		dst.Set(reflect.MakeMapWithSize(dst.Type(), 8))
+	}
+
+	elemType := dst.Type().Elem()
+
+	// 快速路径：map[string]interface{}
+	if elemType.Kind() == reflect.Interface && elemType.NumMethod() == 0 {
+		m := dst.Interface().(map[string]interface{})
+		return d.decodeMapStringInterface(m)
+	}
+
+	// 快速路径：map[string]string
+	if elemType.Kind() == reflect.String {
+		return d.decodeMapStringString(dst)
+	}
+
+	// 通用路径
+	for {
+		// 键必须是字符串
+		if d.token.Type != StringToken {
+			return fmt.Errorf("对象键必须是字符串，得到: %v", d.token)
+		}
+
+		key := bytesToString(d.token.Value)
+		d.nextToken()
+
+		// 键后面必须是冒号
+		if d.token.Type != ColonToken {
+			return fmt.Errorf("对象键后面必须是冒号，得到: %v", d.token)
+		}
+		d.nextToken()
+
+		// 解码值
+		valueElem := reflect.New(elemType).Elem()
+		if err := d.decodeValue(valueElem); err != nil {
+			return err
+		}
+
+		keyElem := reflect.ValueOf(key)
+		dst.SetMapIndex(keyElem, valueElem)
 
 		// 检查是否有更多的键值对
 		if d.token.Type == CommaToken {
@@ -132,13 +166,47 @@ func (d *Decoder) decodeMap(dst reflect.Value) error {
 	return nil
 }
 
+// decodeMapStringString 快速解码 map[string]string
+func (d *Decoder) decodeMapStringString(dst reflect.Value) error {
+	m := dst.Interface().(map[string]string)
+
+	for {
+		if d.token.Type != StringToken {
+			return fmt.Errorf("对象键必须是字符串，得到: %v", d.token)
+		}
+
+		key := bytesToString(d.token.Value)
+		d.nextToken()
+
+		if d.token.Type != ColonToken {
+			return fmt.Errorf("对象键后面必须是冒号，得到: %v", d.token)
+		}
+		d.nextToken()
+
+		if d.token.Type != StringToken {
+			return fmt.Errorf("期望字符串值，得到: %v", d.token)
+		}
+
+		m[key] = bytesToString(d.token.Value)
+		d.nextToken()
+
+		if d.token.Type == CommaToken {
+			d.nextToken()
+		} else if d.token.Type == RightBraceToken {
+			d.nextToken()
+			break
+		} else {
+			return fmt.Errorf("对象中意外的标记: %v", d.token)
+		}
+	}
+
+	return nil
+}
+
 // 缓存结构体字段映射
 var fieldMapCache = sync.Map{} // map[reflect.Type]map[string]int
 
 // 获取字段映射（带缓存）
-//
-//go:inline
-//go:nosplit
 func getFieldMap(structType reflect.Type, fields []structField) map[string]int {
 	// 检查缓存
 	if cachedMap, ok := fieldMapCache.Load(structType); ok {
@@ -172,7 +240,7 @@ func (d *Decoder) decodeStruct(dst reflect.Value) error {
 			return fmt.Errorf("对象键必须是字符串，得到: %v", d.token)
 		}
 
-		key := d.token.Value
+		key := bytesToString(d.token.Value)
 		d.nextToken()
 
 		// 键后面必须是冒号
@@ -182,7 +250,7 @@ func (d *Decoder) decodeStruct(dst reflect.Value) error {
 		d.nextToken()
 
 		// 查找结构体字段
-		fieldIndex, exists := fieldMap[bytesToString(key)]
+		fieldIndex, exists := fieldMap[key]
 
 		if exists && fieldIndex >= 0 {
 			// 字段存在，解码值

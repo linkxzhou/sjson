@@ -5,6 +5,7 @@ import (
 	"io"
 	"sync"
 	"unicode/utf8"
+	"unsafe"
 )
 
 // TokenType 表示词法标记的类型
@@ -13,7 +14,8 @@ type TokenType int
 const (
 	InvalidToken      TokenType = iota // 无效的标记
 	EOFToken                           // 文件结束标记
-	NumberToken                        // 数字标记，例如：123, 45.67
+	IntegerToken                       // 整数标记，例如：123, -456
+	FloatToken                         // 浮点数标记，例如：45.67, 1.23e-4
 	StringToken                        // 字符串标记，例如："hello"
 	NullToken                          // null值标记
 	TrueToken                          // true布尔值标记
@@ -41,17 +43,19 @@ var (
 
 // Token 表示一个词法标记
 type Token struct {
-	Type  TokenType
-	Value []byte
-	Pos   int
+	Type       TokenType
+	FloatValue float64
+	Value      []byte
+	Pos        int
 }
 
 // Lexer 用于将JSON文本转换为标记流
 type Lexer struct {
-	input []byte
-	pos   int
-	start int
-	width int
+	input    []byte
+	inputLen int
+	pos      int
+	start    int
+	width    int
 }
 
 // 用于复用 bytes.Buffer
@@ -63,27 +67,28 @@ var bufferPool = sync.Pool{
 
 // NewLexer 创建一个新的词法分析器
 func NewLexer(input []byte) *Lexer {
-	return &Lexer{input: input}
+	return &Lexer{input: input, inputLen: len(input)}
 }
 
 // NewLexerFromReader 从io.Reader创建一个新的词法分析器
 func NewLexerFromReader(r io.Reader) (*Lexer, error) {
-	// 从对象池获取Buffer
-	buf := bufferPool.Get().(*bytes.Buffer)
-	buf.Reset() // 确保是干净的状态
-	defer bufferPool.Put(buf)
-
-	// 复制内容
-	_, err := io.Copy(buf, r)
+	// 直接读取所有数据到字节切片，避免中间的Buffer拷贝
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
 
-	// 获取字节切片，注意使用buf.Bytes()而不是转换为字符串
-	b := append([]byte(nil), buf.Bytes()...)
+	// 直接创建词法分析器，无需额外拷贝
+	return NewLexer(data), nil
+}
 
-	// 创建词法分析器
-	return NewLexer(b), nil
+// Reset 重置词法分析器状态，用于复用
+func (l *Lexer) Reset(input []byte) {
+	l.input = input
+	l.inputLen = len(input)
+	l.pos = 0
+	l.start = 0
+	l.width = 0
 }
 
 // next 返回下一个字符并前进
@@ -92,6 +97,7 @@ func (l *Lexer) next() rune {
 		l.width = 0
 		return -1
 	}
+
 	r, w := utf8.DecodeRune(l.input[l.pos:])
 	l.width = w
 	l.pos += w
@@ -106,10 +112,23 @@ func (l *Lexer) ignore() {
 // NextToken 返回下一个标记
 func (l *Lexer) NextToken() Token {
 	l.start = l.pos
+	inputLen := l.inputLen
+	// 快速跳过空白字符（8字节批量处理）
+	for l.pos+8 <= inputLen {
+		// 一次读取8个字节
+		chunk := *(*uint64)(unsafe.Pointer(&l.input[l.pos]))
 
-	inputLen := len(l.input)
+		// 检查是否全部都是空白字符
+		// 空格(0x20), 换行(0x0A), 制表符(0x09), 回车(0x0D)
+		if !isAllWhitespace8(chunk) {
+			// 不全是空白字符，需要逐字节处理
+			break
+		}
 
-	// 快速跳过空白字符（ASCII空白）
+		l.pos += 8
+	}
+
+	// 处理剩余字节
 	for l.pos < inputLen {
 		c := l.input[l.pos]
 		if c == ' ' || c == '\n' || c == '\t' || c == '\r' {
@@ -164,6 +183,8 @@ func (l *Lexer) NextToken() Token {
 		bytes.Equal(l.input[l.start:l.start+5], falseByte) {
 		l.pos = l.start + 5
 		return Token{Type: FalseToken, Value: falseByte, Pos: l.start}
+	} else {
+		// pass
 	}
 
 	// 无效标记
@@ -182,48 +203,82 @@ func (l *Lexer) lexString() Token {
 	}
 	l.ignore() // 忽略起始引号，start 指向内容开始
 
-	buf := bufferPool.Get().(*bytes.Buffer)
-	buf.Reset()
-	// 使用 defer 确保 buffer 被归还，即使发生 panic
-	defer bufferPool.Put(buf)
+	// 快速路径：无转义字符的情况
+	// 直接在原始输入上操作，零拷贝
+	start := l.pos
+	// 快速路径：一次处理8个字节
+	inputLen := l.inputLen
+	for l.pos+8 <= inputLen {
+		// 一次读取8个字节
+		chunk := *(*uint64)(unsafe.Pointer(&l.input[l.pos]))
 
-	// 优化：处理非转义字符块
-	chunkStart := l.pos
+		// 检查是否包含引号 (0x22) 或反斜杠 (0x5C)
+		// 使用位运算快速检测特殊字符
+		hasQuote := hasBytes8(chunk, 0x2222222222222222)     // 8个引号
+		hasBackslash := hasBytes8(chunk, 0x5C5C5C5C5C5C5C5C) // 8个反斜杠
+		hasControl := hasControlChars8(chunk)                // 控制字符 < 0x20
 
-	// 预分配内存减少重新分配
-	if buf.Cap() < 32 {
-		buf.Grow(32) // 为常见字符串预分配一些空间
+		if hasQuote || hasBackslash || hasControl {
+			// 有特殊字符，逐字节处理这8个字节
+			break
+		}
+
+		l.pos += 8
 	}
 
-	// 快速路径：无转义字符的情况
-	// 单次循环扫描，避免两次遍历
-	start := l.pos
-	for ; l.pos < len(l.input); l.pos++ {
+	// 处理剩余的字节（不足8个或遇到特殊字符）
+	for l.pos < inputLen {
 		c := l.input[l.pos]
 		if c == '"' {
+			// 直接返回原始输入的切片，零拷贝
 			value := l.input[start:l.pos]
 			l.pos++ // 跳过结束引号
 			return Token{Type: StringToken, Value: value, Pos: startPos}
 		}
 		if c == '\\' {
+			// 遇到转义字符，需要进入慢路径
 			break
 		}
+		// 检查无效字符（控制字符）
+		if c < 0x20 {
+			return Token{Type: InvalidToken, Value: []byte("字符串中包含无效控制字符"), Pos: l.pos}
+		}
+		l.pos++
 	}
 
 	// 慢路径：处理带转义字符的情况
+	// 只有在遇到转义字符时才使用buffer
+	buf := bufferPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer bufferPool.Put(buf)
+
+	// 预分配内存减少重新分配
+	if buf.Cap() < 32 {
+		buf.Grow(32)
+	}
+
+	// 将已经扫描的无转义部分写入buffer
+	if l.pos > start {
+		buf.Write(l.input[start:l.pos])
+	}
+
+	// 处理剩余的带转义字符的部分
+	chunkStart := l.pos
+
 	for {
 		c = l.next()
 		if c == '\\' {
 			// 追加反斜杠之前的块
-			if l.pos > chunkStart+l.width { // 检查是否有内容需要追加 (l.width 是 '\' 的宽度)
+			if l.pos > chunkStart+l.width {
 				buf.Write(l.input[chunkStart : l.pos-l.width])
 			}
 
 			// 处理转义序列
 			esc := l.next()
-			if esc == -1 { // 反斜杠后遇到EOF
+			if esc == -1 {
 				return Token{Type: InvalidToken, Value: []byte("未闭合的字符串 (EOF after escape)"), Pos: startPos}
 			}
+
 			switch esc {
 			case '"', '\\', '/':
 				buf.WriteByte(byte(esc))
@@ -238,154 +293,57 @@ func (l *Lexer) lexString() Token {
 			case 't':
 				buf.WriteByte('\t')
 			case 'u':
-				// 检查是否有足够的字符用于 \uXXXX
+				// Unicode转义处理
 				if l.pos+4 > len(l.input) {
 					return Token{Type: InvalidToken, Value: []byte("无效的 Unicode 转义序列 (过短)"), Pos: l.pos - 1}
 				}
+
 				hex := l.input[l.pos : l.pos+4]
-				code, err := parseIntFromBytes(hex, 16, 32)
+				code, _, err := parseIntFromBytes(hex, 16, 32)
 				if err != nil {
-					return Token{Type: InvalidToken, Value: []byte("无效的 Unicode 转义序列: " + string(hex)), Pos: l.pos - 1}
+					return Token{Type: InvalidToken, Value: []byte("无效的 Unicode 转义序列"), Pos: l.pos - 1}
 				}
-				l.pos += 4 // 跳过4个十六进制数字
-
-				// 处理Unicode代理对 (surrogate pairs)
-				if code >= 0xD800 && code <= 0xDBFF { // 高代理项 (high surrogate)
-					// 检查是否紧跟着另一个 \u 转义序列
-					if l.pos+6 <= len(l.input) && l.input[l.pos] == '\\' && l.input[l.pos+1] == 'u' {
-						// 提前移动位置到下一个 \u 后面
-						l.pos += 2
-
-						// 读取低代理项 (low surrogate)
-						if l.pos+4 > len(l.input) {
-							return Token{Type: InvalidToken, Value: []byte("无效的 Unicode 代理对 (过短)"), Pos: l.pos - 1}
-						}
-
-						lowHex := l.input[l.pos : l.pos+4]
-						lowCode, err := parseIntFromBytes(lowHex, 16, 32)
-						if err != nil {
-							return Token{Type: InvalidToken, Value: []byte("无效的 Unicode 代理对: " + string(lowHex)), Pos: l.pos - 1}
-						}
-
-						// 检查是否是有效的低代理项
-						if lowCode >= 0xDC00 && lowCode <= 0xDFFF {
-							// 计算完整的Unicode代码点
-							// 公式: (highSurrogate - 0xD800) * 0x400 + (lowSurrogate - 0xDC00) + 0x10000
-							fullCode := (code-0xD800)*0x400 + (lowCode - 0xDC00) + 0x10000
-							buf.WriteRune(rune(fullCode))
-							l.pos += 4 // 跳过低代理项的4个十六进制数字
-						} else {
-							// 不是有效的低代理项，回退位置并只处理高代理项
-							l.pos -= 2 // 回退到 \u 之前
-							buf.WriteRune(rune(code))
-						}
-					} else {
-						// 没有紧跟着的低代理项，只处理单个 \u 转义序列
-						buf.WriteRune(rune(code))
-					}
-				} else {
-					// 普通的 Unicode 字符
-					buf.WriteRune(rune(code))
-				}
+				l.pos += 4
+				buf.WriteRune(rune(code))
 			default:
-				// 无效的转义序列
-				// 定位到反斜杠的位置 (当前 pos - 转义符宽度 - 反斜杠宽度)
-				return Token{Type: InvalidToken, Value: []byte("无效的转义字符: \\" + string(esc)), Pos: l.pos - l.width*2}
+				return Token{Type: InvalidToken, Value: []byte("无效的转义字符"), Pos: l.pos - l.width*2}
 			}
-			// 更新下一个块的起始位置
-			chunkStart = l.pos
 
+			chunkStart = l.pos
 		} else if c == '"' {
 			// 追加结束引号之前的最后一个块
-			if l.pos > chunkStart+l.width { // 检查是否有内容需要追加 (l.width 是 '"' 的宽度)
+			if l.pos > chunkStart+l.width {
 				buf.Write(l.input[chunkStart : l.pos-l.width])
 			}
-			// 字符串结束
 			break
-		} else if c == -1 { // 在结束引号之前遇到EOF
+		} else if c == -1 {
 			return Token{Type: InvalidToken, Value: []byte("未闭合的字符串"), Pos: startPos}
+		} else if c < 0x20 {
+			return Token{Type: InvalidToken, Value: []byte("字符串中包含无效控制字符"), Pos: l.pos - l.width}
 		}
-		// 如果是普通字符，则继续循环，它是当前块的一部分
 	}
 
-	// 创建结果的字节切片副本，这样即使buf被归还并重用也不会影响结果
+	// 创建结果副本
 	result := append([]byte(nil), buf.Bytes()...)
-
-	// 注意：Token 的 Pos 应该是原始字符串中标记的起始位置，包括引号
 	return Token{Type: StringToken, Value: result, Pos: startPos}
 }
 
 // lexNumber 解析数字标记
 func (l *Lexer) lexNumber() Token {
 	startPos := l.start
-	inputLen := len(l.input)
-	// 直接扫描数字，避免多次函数调用
-	// 1. 处理负号
-	if l.pos < inputLen && l.input[l.pos] == '-' {
-		l.pos++
+	inputLen := l.inputLen
+	n, i, isFloat, err := parseFloatFromBytes(l.input[l.start:inputLen], 64)
+	if err != nil && err != errInvalidDigitError {
+		return Token{Type: InvalidToken, Value: []byte(err.Error()), Pos: startPos}
 	}
 
-	// 2. 处理整数部分
-	if l.pos < inputLen && l.input[l.pos] == '0' {
-		l.pos++
-		// 如果以0开头，后面不能直接跟数字 (除非是 0.xxx)
-		if l.pos < inputLen && l.input[l.pos] >= '0' && l.input[l.pos] <= '9' {
-			return Token{Type: InvalidToken, Value: []byte("无效的数字格式 (以0开头)"), Pos: startPos}
-		}
-	} else if l.pos < inputLen && l.input[l.pos] >= '1' && l.input[l.pos] <= '9' {
-		l.pos++ // 第一个数字
-		// 扫描剩余数字
-		for l.pos < inputLen && l.input[l.pos] >= '0' && l.input[l.pos] <= '9' {
-			l.pos++
-		}
-	} else {
-		// 没有整数部分
-		return Token{Type: InvalidToken, Value: []byte("无效的数字格式 (缺少整数部分)"), Pos: startPos}
+	// 跳过解析的字符数
+	l.pos += i
+
+	// 根据是否为浮点数返回不同的token类型
+	if isFloat {
+		return Token{Type: FloatToken, FloatValue: n, Pos: startPos}
 	}
 
-	// 3. 处理小数部分
-	if l.pos < inputLen && l.input[l.pos] == '.' {
-		l.pos++ // 跳过小数点
-
-		// 小数点后必须有数字
-		if l.pos >= inputLen || l.input[l.pos] < '0' || l.input[l.pos] > '9' {
-			return Token{Type: InvalidToken, Value: []byte("无效的数字格式 (小数点后无数字)"), Pos: l.pos - 1}
-		}
-
-		// 扫描小数部分的数字
-		for l.pos < inputLen {
-			c := l.input[l.pos]
-			if c < '0' || c > '9' {
-				break
-			}
-			l.pos++
-		}
-	}
-
-	// 4. 处理指数部分
-	if l.pos < inputLen && (l.input[l.pos] == 'e' || l.input[l.pos] == 'E') {
-		l.pos++ // 跳过 e/E
-
-		// 处理可选的 +/-
-		if l.pos < inputLen && (l.input[l.pos] == '+' || l.input[l.pos] == '-') {
-			l.pos++
-		}
-
-		// e/E 后面必须有数字
-		if l.pos >= inputLen || l.input[l.pos] < '0' || l.input[l.pos] > '9' {
-			return Token{Type: InvalidToken, Value: []byte("无效的数字格式 (指数后无数字)"), Pos: l.pos - 1}
-		}
-
-		// 扫描指数部分的数字
-		for l.pos < inputLen {
-			c := l.input[l.pos]
-			if c < '0' || c > '9' {
-				break
-			}
-			l.pos++
-		}
-	}
-
-	numStr := l.input[startPos:l.pos]
-	return Token{Type: NumberToken, Value: numStr, Pos: startPos}
+	return Token{Type: IntegerToken, FloatValue: n, Pos: startPos}
 }
