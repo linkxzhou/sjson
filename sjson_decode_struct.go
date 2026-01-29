@@ -1,6 +1,7 @@
 package sjson
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"sync"
@@ -231,8 +232,15 @@ func (d *Decoder) decodeStruct(dst reflect.Value) error {
 	// 预先获取所有字段信息，避免重复查找
 	fields := getStructFields(structType)
 
-	// 获取字段映射（使用缓存）
-	fieldMap := getFieldMap(structType, fields)
+	// 小结构体（字段很少）走线性匹配：避免 sync.Map + map 哈希开销
+	// 这类结构体在很多真实 payload 中占比很高（例如 BenchmarkCompareMedium）。
+	useLinearScan := len(fields) <= 8
+
+	var fieldMap map[string]int
+	if !useLinearScan {
+		// 字段较多再使用 map 加速查找
+		fieldMap = getFieldMap(structType, fields)
+	}
 
 	for {
 		// 键必须是字符串
@@ -240,7 +248,11 @@ func (d *Decoder) decodeStruct(dst reflect.Value) error {
 			return fmt.Errorf("对象键必须是字符串，得到: %v", d.token)
 		}
 
-		key := bytesToString(d.token.Value)
+		keyBytes := d.token.Value
+		var key string
+		if !useLinearScan {
+			key = bytesToString(keyBytes)
+		}
 		d.nextToken()
 
 		// 键后面必须是冒号
@@ -249,21 +261,30 @@ func (d *Decoder) decodeStruct(dst reflect.Value) error {
 		}
 		d.nextToken()
 
-		// 查找结构体字段
-		fieldIndex, exists := fieldMap[key]
+		fieldIndex := -1
+		if useLinearScan {
+			// 线性扫描：字段数很少时通常比 map 查找更快
+			for i := range fields {
+				if bytes.Equal(fields[i].name, keyBytes) {
+					fieldIndex = fields[i].index
+					break
+				}
+			}
+		} else {
+			// map 查找：字段数多时更合适
+			if idx, exists := fieldMap[key]; exists {
+				fieldIndex = idx
+			}
+		}
 
-		if exists && fieldIndex >= 0 {
+		if fieldIndex >= 0 {
 			// 字段存在，解码值
 			field := dst.Field(fieldIndex)
-			if field.CanSet() {
-				if err := d.decodeValue(field); err != nil {
-					return fmt.Errorf("解码字段 %s 出错: %w", key, err)
+			if err := d.decodeValue(field); err != nil {
+				if useLinearScan {
+					return fmt.Errorf("解码字段 %s 出错: %w", bytesToString(keyBytes), err)
 				}
-			} else {
-				// 字段不可设置，跳过值
-				if err := d.skipValue(); err != nil {
-					return err
-				}
+				return fmt.Errorf("解码字段 %s 出错: %w", key, err)
 			}
 		} else {
 			// 字段不存在，跳过值

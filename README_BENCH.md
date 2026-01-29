@@ -158,13 +158,13 @@ BenchmarkCompareMedium/SjsonUnmarshal-14       	 1948396	      5828 ns/op	    59
 BenchmarkCompareMedium/StdUnmarshal-14         	 1469923	      8227 ns/op	     504 B/op	      11 allocs/op
 BenchmarkCompareMedium/JsoniterUnmarshal-14    	 5809028	      2028 ns/op	     384 B/op	      41 allocs/op
 
-第九轮：通过AI优化部分代码
-BenchmarkCompareMedium/SjsonMarshal-14         	45039204	       260.1 ns/op	     216 B/op	       2 allocs/op
-BenchmarkCompareMedium/StdMarshal-14           	49513826	       244.3 ns/op	     216 B/op	       2 allocs/op
-BenchmarkCompareMedium/JsoniterMarshal-14      	48162411	       240.1 ns/op	     216 B/op	       2 allocs/op
-BenchmarkCompareMedium/SjsonUnmarshal-14       	 3365167	      3371 ns/op	      56 B/op	       4 allocs/op
-BenchmarkCompareMedium/StdUnmarshal-14         	 1474742	      8185 ns/op	     504 B/op	      11 allocs/op
-BenchmarkCompareMedium/JsoniterUnmarshal-14    	 5992104	      2013 ns/op	     352 B/op	      38 allocs/op
+第九轮：AI优化（Claude-Opus-4.5）
+BenchmarkCompareMedium/SjsonMarshal-14         	44616271	       245.9 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/StdMarshal-14           	52140880	       233.9 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/JsoniterMarshal-14      	53421279	       230.6 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/SjsonUnmarshal-14       	 6039058	      1972 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCompareMedium/StdUnmarshal-14         	 1440298	      8207 ns/op	     504 B/op	      11 allocs/op
+BenchmarkCompareMedium/JsoniterUnmarshal-14    	 6100338	      1962 ns/op	     352 B/op	      38 allocs/op
 ```
 
 ## 4. 与其他 JSON 库的性能对比
@@ -226,6 +226,14 @@ BenchmarkCompareMedium/JsoniterMarshal-14      	51207300	       237.5 ns/op	    
 BenchmarkCompareMedium/SjsonUnmarshal-14       	 3606482	      3338 ns/op	      56 B/op	       4 allocs/op
 BenchmarkCompareMedium/StdUnmarshal-14         	 1486693	      8076 ns/op	     504 B/op	      11 allocs/op
 BenchmarkCompareMedium/JsoniterUnmarshal-14    	 5898898	      2015 ns/op	     352 B/op	      38 allocs/op
+
+第九轮：AI优化（Claude-Opus-4.5）
+BenchmarkCompareMedium/SjsonMarshal-14         	41330206	       249.4 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/StdMarshal-14           	52207790	       235.6 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/JsoniterMarshal-14      	52880450	       236.8 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/SjsonUnmarshal-14       	 6013011	      2017 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCompareMedium/StdUnmarshal-14         	 1514985	      7978 ns/op	     504 B/op	      11 allocs/op
+BenchmarkCompareMedium/JsoniterUnmarshal-14    	 6061309	      1994 ns/op	     352 B/op	      38 allocs/op
 ```
 
 ## 5. byte_utils.go 和 strconv 对比
@@ -280,4 +288,18 @@ BenchmarkUnmarshalCompareTypes/JsoniterArray-14       	38158299	       321.1 ns/
 BenchmarkUnmarshalCompareTypes/SjsonNestedObject-14   	 9108824	      1353 ns/op	    1849 B/op	      34 allocs/op
 BenchmarkUnmarshalCompareTypes/StdlibNestedObject-14  	 6704002	      1813 ns/op	    1984 B/op	      50 allocs/op
 BenchmarkUnmarshalCompareTypes/JsoniterNestedObject-14         	10573021	      1152 ns/op	    1977 B/op	      58 allocs/op
+
+第三轮：
+BenchmarkUnmarshalCompareTypes/SjsonSimple-14         	209526379	        57.23 ns/op	      24 B/op	       2 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibSimple-14        	100000000	       106.9 ns/op	     176 B/op	       4 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterSimple-14      	157866882	        76.24 ns/op	      40 B/op	       3 allocs/op
+BenchmarkUnmarshalCompareTypes/SjsonSmallObject-14    	58739426	       202.9 ns/op	     368 B/op	       5 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibSmallObject-14   	29230431	       417.9 ns/op	     592 B/op	      14 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterSmallObject-14 	50929840	       235.1 ns/op	     464 B/op	      13 allocs/op
+BenchmarkUnmarshalCompareTypes/SjsonArray-14          	37832845	       317.3 ns/op	     288 B/op	      13 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibArray-14         	16177179	       733.8 ns/op	     760 B/op	      19 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterArray-14       	37460115	       319.5 ns/op	     600 B/op	      16 allocs/op
+BenchmarkUnmarshalCompareTypes/SjsonNestedObject-14   	12173078	      1004 ns/op	    1690 B/op	      29 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibNestedObject-14  	 6676039	      1811 ns/op	    1984 B/op	      50 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterNestedObject-14         	10289276	      1153 ns/op	    1977 B/op	      58 allocs/op
 ```

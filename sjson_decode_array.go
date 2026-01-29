@@ -78,6 +78,11 @@ func (d *Decoder) decodeSlice(dst reflect.Value) error {
 		return d.decodeFloat64Slice(dst)
 	}
 
+	// 快速路径：[]*struct（常见场景，避免 reflect.New/MakeSlice 的反复分配）
+	if elemType.Kind() == reflect.Ptr && elemType.Elem().Kind() == reflect.Struct {
+		return d.decodePtrStructSlice(dst, elemType)
+	}
+
 	// 通用路径
 	return d.decodeSliceGeneric(dst, elemType)
 }
@@ -195,6 +200,88 @@ func (d *Decoder) decodeFloat64Slice(dst reflect.Value) error {
 	}
 
 	dst.Set(reflect.ValueOf(result))
+	return nil
+}
+
+// decodePtrStructSlice 快速解码 []*T（T 为 struct），复用 slice 容量与元素指针
+func (d *Decoder) decodePtrStructSlice(dst reflect.Value, elemType reflect.Type) error {
+	// 初始化/复用切片
+	if dst.IsNil() {
+		dst.Set(reflect.MakeSlice(dst.Type(), 0, 8))
+	}
+
+	oldLen := dst.Len()
+	n := 0
+
+	for {
+		// 允许数组元素为 null
+		switch d.token.Type {
+		case NullToken:
+			// 将该元素置为 nil
+			if n < dst.Len() {
+				// 确保长度至少为 n+1
+				if n >= dst.Len() {
+					dst.SetLen(n + 1)
+				}
+				idx := dst.Index(n)
+				idx.Set(reflect.Zero(elemType))
+			} else {
+				// 需要扩容/追加
+				if n < dst.Cap() {
+					dst.SetLen(n + 1)
+					dst.Index(n).Set(reflect.Zero(elemType))
+				} else {
+					dst.Set(reflect.Append(dst, reflect.Zero(elemType)))
+				}
+			}
+			d.nextToken()
+
+		case LeftBraceToken:
+			// 确保切片长度至少为 n+1
+			if n >= dst.Len() {
+				if n < dst.Cap() {
+					dst.SetLen(n + 1)
+				} else {
+					dst.Set(reflect.Append(dst, reflect.Zero(elemType)))
+				}
+			}
+
+			elemPtr := dst.Index(n)
+			if elemPtr.IsNil() {
+				elemPtr.Set(reflect.New(elemType.Elem()))
+			}
+
+			// 直接解码对象到结构体，避免 decodeValue 的指针展开开销
+			if err := d.decodeObject(elemPtr.Elem()); err != nil {
+				return err
+			}
+
+		default:
+			return fmt.Errorf("期望对象或null，得到: %v", d.token)
+		}
+
+		n++
+
+		// 检查分隔符
+		if d.token.Type == CommaToken {
+			d.nextToken()
+			continue
+		}
+		if d.token.Type == RightBracketToken {
+			d.nextToken()
+			break
+		}
+		return fmt.Errorf("数组中意外的标记: %v", d.token)
+	}
+
+	// 如果比原来短，清理尾部以避免保留旧指针
+	if oldLen > n {
+		for i := n; i < oldLen; i++ {
+			dst.Index(i).Set(reflect.Zero(elemType))
+		}
+	}
+
+	dst.SetLen(n)
 	return nil
 }
 

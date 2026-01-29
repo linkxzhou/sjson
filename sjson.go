@@ -44,8 +44,8 @@ func getStructFields(t reflect.Type) []structField {
 
 	for i := 0; i < numField; i++ {
 		f := t.Field(i)
-		// 跳过未导出字段
-		if f.PkgPath != "" && !f.Anonymous {
+		// 跳过未导出字段（反射不可写；encoding/json 也会忽略）
+		if f.PkgPath != "" {
 			continue
 		}
 
