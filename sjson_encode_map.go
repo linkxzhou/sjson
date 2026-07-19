@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"slices"
 	"sync"
+	"unicode/utf8"
 )
 
 // 对象池优化：复用 reflectWithString 切片
@@ -29,6 +30,39 @@ func putReflectWithStringSlice(slice []reflectWithString) {
 		reflectWithStringPool.Put(slice)
 	}
 }
+// encodeMapKey 将 map 键编码为 JSON 字符串（带转义）
+func encodeMapKey(stream *encoderStream, ks []byte) {
+	stream.buffer = append(stream.buffer, '"')
+	// 检查是否需要转义
+	needsEscape := false
+	for i := 0; i < len(ks); i++ {
+		if ks[i] < utf8.RuneSelf && !safeSet[ks[i]] {
+			needsEscape = true
+			break
+		}
+	}
+	if !needsEscape {
+		stream.buffer = append(stream.buffer, ks...)
+	} else {
+		for i := 0; i < len(ks); {
+			if c := ks[i]; c < utf8.RuneSelf {
+				if !safeSet[c] {
+					stream.buffer = escapeStringToBytes(stream.buffer, c)
+					i++
+				} else {
+					stream.buffer = append(stream.buffer, c)
+					i++
+				}
+			} else {
+				_, size := utf8.DecodeRune(ks[i:])
+				stream.buffer = append(stream.buffer, ks[i:i+size]...)
+				i += size
+			}
+		}
+	}
+	stream.buffer = append(stream.buffer, '"', ':')
+}
+
 
 // map[string]interface{} 专用编码器
 type mapStringInterfaceEncoder struct {
@@ -71,9 +105,7 @@ func (e mapStringInterfaceEncoder) encodeSinglePair(stream *encoderStream, mi *r
 		return fmt.Errorf("json: encoding error for map key: %q", err.Error())
 	}
 
-	stream.buffer = append(stream.buffer, '"')
-	stream.buffer = append(stream.buffer, ks...)
-	stream.buffer = append(stream.buffer, '"', ':')
+	encodeMapKey(stream, ks)
 
 	miValue := mi.Value()
 
@@ -233,9 +265,7 @@ func encodeMapStringInterfaceFast(stream *encoderStream, src reflect.Value) erro
 		first = false
 
 		// 编码键
-		stream.buffer = append(stream.buffer, '"')
-		stream.buffer = append(stream.buffer, mi.Key().String()...)
-		stream.buffer = append(stream.buffer, '"', ':')
+		encodeMapKey(stream, stringToBytes(mi.Key().String()))
 
 		// 编码值
 		if err := encodeInterfaceValueFast(stream, mi.Value()); err != nil {
@@ -284,9 +314,7 @@ func (e mapStringInterfaceEncoder) encodeSortedPairs(stream *encoderStream, mi *
 		if i > 0 {
 			stream.buffer = append(stream.buffer, ',')
 		}
-		stream.buffer = append(stream.buffer, '"')
-		stream.buffer = append(stream.buffer, kv.ks...)
-		stream.buffer = append(stream.buffer, '"', ':')
+		encodeMapKey(stream, kv.ks)
 
 		if err := encodeInterfaceValueFast(stream, kv.v); err != nil {
 			return err
@@ -308,9 +336,7 @@ func (e mapStringInterfaceEncoder) encodeUnsortedPairs(stream *encoderStream, mi
 		if i > 0 {
 			stream.buffer = append(stream.buffer, ',')
 		}
-		stream.buffer = append(stream.buffer, '"')
-		stream.buffer = append(stream.buffer, ks...)
-		stream.buffer = append(stream.buffer, '"', ':')
+		encodeMapKey(stream, ks)
 
 		if err := encodeInterfaceValueFast(stream, mi.Value()); err != nil {
 			return err
@@ -362,9 +388,7 @@ func (e mapEncoder) encodeSinglePair(stream *encoderStream, mi *reflect.MapIter)
 		return fmt.Errorf("json: encoding error for map key: %q", err.Error())
 	}
 
-	stream.buffer = append(stream.buffer, '"')
-	stream.buffer = append(stream.buffer, ks...)
-	stream.buffer = append(stream.buffer, '"', ':')
+	encodeMapKey(stream, ks)
 
 	err = e.valueEncoder.appendToBytes(stream, mi.Value())
 	if err != nil {
@@ -412,9 +436,7 @@ func (e mapEncoder) encodeSortedPairs(stream *encoderStream, mi *reflect.MapIter
 		if i > 0 {
 			stream.buffer = append(stream.buffer, ',')
 		}
-		stream.buffer = append(stream.buffer, '"')
-		stream.buffer = append(stream.buffer, kv.ks...)
-		stream.buffer = append(stream.buffer, '"', ':')
+		encodeMapKey(stream, kv.ks)
 
 		err := e.valueEncoder.appendToBytes(stream, kv.v)
 		if err != nil {
@@ -437,9 +459,7 @@ func (e mapEncoder) encodeUnsortedPairs(stream *encoderStream, mi *reflect.MapIt
 		if i > 0 {
 			stream.buffer = append(stream.buffer, ',')
 		}
-		stream.buffer = append(stream.buffer, '"')
-		stream.buffer = append(stream.buffer, ks...)
-		stream.buffer = append(stream.buffer, '"', ':')
+		encodeMapKey(stream, ks)
 
 		err = e.valueEncoder.appendToBytes(stream, mi.Value())
 		if err != nil {

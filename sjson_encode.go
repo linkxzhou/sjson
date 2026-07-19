@@ -1,6 +1,8 @@
 package sjson
 
 import (
+	"encoding"
+	"encoding/json"
 	"reflect"
 	"sync"
 )
@@ -43,7 +45,79 @@ var sliceEncoderPool sync.Map
 var mapEncoderPool sync.Map
 var ptrEncoderPool sync.Map
 
+// json.Marshaler / encoding.TextMarshaler 接口类型，用于编码器构建时的静态检查
+var (
+	jsonMarshalerType = reflect.TypeOf((*json.Marshaler)(nil)).Elem()
+	textMarshalerType = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
+)
+
+// jsonMarshalerEncoder 用于类型本身（值接收者或指针类型）实现 json.Marshaler 的情况
+type jsonMarshalerEncoder struct{}
+
+func (e jsonMarshalerEncoder) appendToBytes(stream *encoderStream, src reflect.Value) error {
+	if src.Kind() == reflect.Ptr && src.IsNil() {
+		stream.buffer = append(stream.buffer, nullString...)
+		return nil
+	}
+	m := src.Interface().(json.Marshaler)
+	data, err := m.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	stream.buffer = append(stream.buffer, data...)
+	return nil
+}
+
+// addrJSONMarshalerEncoder 用于仅指针接收者实现 json.Marshaler 的情况（值本身不可寻址时回退到基础编码器）
+type addrJSONMarshalerEncoder struct{ fallback Encoder }
+
+func (e addrJSONMarshalerEncoder) appendToBytes(stream *encoderStream, src reflect.Value) error {
+	if src.CanAddr() {
+		m := src.Addr().Interface().(json.Marshaler)
+		data, err := m.MarshalJSON()
+		if err != nil {
+			return err
+		}
+		stream.buffer = append(stream.buffer, data...)
+		return nil
+	}
+	return e.fallback.appendToBytes(stream, src)
+}
+
+// jsonTextMarshalerEncoder 用于类型本身实现 encoding.TextMarshaler 的情况
+type jsonTextMarshalerEncoder struct{}
+
+func (e jsonTextMarshalerEncoder) appendToBytes(stream *encoderStream, src reflect.Value) error {
+	if src.Kind() == reflect.Ptr && src.IsNil() {
+		stream.buffer = append(stream.buffer, nullString...)
+		return nil
+	}
+	m := src.Interface().(encoding.TextMarshaler)
+	data, err := m.MarshalText()
+	if err != nil {
+		return err
+	}
+	return encodeStringDirect(stream, string(data))
+}
+
+// addrJSONTextMarshalerEncoder 用于仅指针接收者实现 encoding.TextMarshaler 的情况
+type addrJSONTextMarshalerEncoder struct{ fallback Encoder }
+
+func (e addrJSONTextMarshalerEncoder) appendToBytes(stream *encoderStream, src reflect.Value) error {
+	if src.CanAddr() {
+		m := src.Addr().Interface().(encoding.TextMarshaler)
+		data, err := m.MarshalText()
+		if err != nil {
+			return err
+		}
+		return encodeStringDirect(stream, string(data))
+	}
+	return e.fallback.appendToBytes(stream, src)
+}
+
 // encodeValueToBytes 直接将Go值编码到字节切片中
+// json.Marshaler / encoding.TextMarshaler 的检查已下沉到 getEncoder 中静态完成，
+// 这样嵌套的结构体字段、切片元素、map 值等也能正确应用自定义序列化逻辑。
 func encodeValueToBytes(stream *encoderStream, src reflect.Value, typ reflect.Type) error {
 	if !src.IsValid() {
 		stream.buffer = append(stream.buffer, nullString...)
@@ -109,6 +183,41 @@ func getEncoder(t reflect.Type) Encoder {
 		return enc.(Encoder)
 	}
 
+	var enc Encoder
+
+	// json.Marshaler / encoding.TextMarshaler 检查：
+	// 类型本身或其指针类型实现了这些接口时，编码必须调用对应方法，而不能走默认反射编码
+	// （time.Time 等标准库类型即依赖此机制）
+	if t.Implements(jsonMarshalerType) {
+		enc = jsonMarshalerEncoder{}
+		EncoderCache.Store(t, enc)
+		return enc
+	}
+	if t.Kind() != reflect.Ptr && reflect.PointerTo(t).Implements(jsonMarshalerType) {
+		fallback := getEncoderBase(t)
+		enc = addrJSONMarshalerEncoder{fallback: fallback}
+		EncoderCache.Store(t, enc)
+		return enc
+	}
+	if t.Implements(textMarshalerType) {
+		enc = jsonTextMarshalerEncoder{}
+		EncoderCache.Store(t, enc)
+		return enc
+	}
+	if t.Kind() != reflect.Ptr && reflect.PointerTo(t).Implements(textMarshalerType) {
+		fallback := getEncoderBase(t)
+		enc = addrJSONTextMarshalerEncoder{fallback: fallback}
+		EncoderCache.Store(t, enc)
+		return enc
+	}
+
+	enc = getEncoderBase(t)
+	EncoderCache.Store(t, enc)
+	return enc
+}
+
+// getEncoderBase 构建不考虑 Marshaler 接口的基础编码器（内部使用，避免递归检查接口）
+func getEncoderBase(t reflect.Type) Encoder {
 	var enc Encoder
 
 	// 使用预分配的基本类型编码器实例
@@ -184,6 +293,7 @@ func getEncoder(t reflect.Type) Encoder {
 			fields:       fields,
 			numFields:    len(fields),
 			hasOmitEmpty: hasOmitEmpty,
+			opcodes:      newStructOpcodeProgram(t, fields),
 		}
 	case reflect.Interface:
 		enc = interfaceEncoderInst
@@ -200,6 +310,5 @@ func getEncoder(t reflect.Type) Encoder {
 		enc = defaultEncoderInst
 	}
 
-	EncoderCache.Store(t, enc)
 	return enc
 }

@@ -3,6 +3,7 @@ package sjson
 import (
 	"bytes"
 	"io"
+	"strconv"
 	"sync"
 	"unicode/utf8"
 	"unsafe"
@@ -45,7 +46,10 @@ var (
 type Token struct {
 	Type       TokenType
 	FloatValue float64
+	IntValue   int64
+	IsInteger  bool
 	Value      []byte
+	RawNumber  []byte // 数字 token 的原始字节，用于精确转换
 	Pos        int
 }
 
@@ -304,6 +308,33 @@ func (l *Lexer) lexStringEscape(startPos, contentStart int) Token {
 					return Token{Type: InvalidToken, Value: []byte("无效的 Unicode 转义序列"), Pos: l.pos - 1}
 				}
 				l.pos += 4
+
+				// 处理 UTF-16 代理对
+				if code >= 0xD800 && code <= 0xDBFF {
+					// 高代理项，检查是否有低代理项
+					if l.pos+6 <= inputLen &&
+						l.input[l.pos] == '\\' && l.input[l.pos+1] == 'u' {
+						hex2 := l.input[l.pos+2 : l.pos+6]
+						code2, _, err2 := parseIntFromBytes(hex2, 16, 32)
+						if err2 == nil && code2 >= 0xDC00 && code2 <= 0xDFFF {
+							// 合并代理对
+							r := 0x10000 + ((code - 0xD800) << 10) + (code2 - 0xDC00)
+							l.pos += 6
+							buf.WriteRune(rune(r))
+							continue
+						}
+					}
+					// 孤立高代理项：替换为 U+FFFD
+					buf.WriteRune('\uFFFD')
+					continue
+				}
+
+				if code >= 0xDC00 && code <= 0xDFFF {
+					// 孤立低代理项：替换为 U+FFFD
+					buf.WriteRune('\uFFFD')
+					continue
+				}
+
 				buf.WriteRune(rune(code))
 			default:
 				return Token{Type: InvalidToken, Value: []byte("无效的转义字符"), Pos: l.pos - 2}
@@ -329,18 +360,85 @@ func (l *Lexer) lexStringEscape(startPos, contentStart int) Token {
 func (l *Lexer) lexNumber() Token {
 	startPos := l.start
 	inputLen := l.inputLen
-	n, i, isFloat, err := parseFloatFromBytes(l.input[l.start:inputLen], 64)
-	if err != nil && err != errInvalidDigitError {
-		return Token{Type: InvalidToken, Value: []byte(err.Error()), Pos: startPos}
+	start := l.start
+
+	// 扫描数字字节，确定是否为浮点数
+	isFloat := false
+	pos := start
+
+	// 处理符号
+	if pos < inputLen && (l.input[pos] == '-' || l.input[pos] == '+') {
+		pos++
 	}
 
-	// 跳过解析的字符数
-	l.pos += i
+	// 整数部分
+	hasDigits := false
+	if pos < inputLen && l.input[pos] == '0' {
+		// 前导零：仅允许 "0" 或 "0." 或 "0e/E"
+		pos++
+		hasDigits = true
+	} else {
+		for pos < inputLen && l.input[pos] >= '0' && l.input[pos] <= '9' {
+			pos++
+			hasDigits = true
+		}
+	}
 
-	// 根据是否为浮点数返回不同的token类型
+	// 小数部分
+	if pos < inputLen && l.input[pos] == '.' {
+		isFloat = true
+		pos++
+		// 小数部分必须至少有一位数字
+		fracStart := pos
+		for pos < inputLen && l.input[pos] >= '0' && l.input[pos] <= '9' {
+			pos++
+		}
+		if pos == fracStart {
+			return Token{Type: InvalidToken, Value: []byte("无效的浮点数格式: 缺少小数部分"), Pos: startPos}
+		}
+	}
+
+	// 指数部分
+	if pos < inputLen && (l.input[pos] == 'e' || l.input[pos] == 'E') {
+		isFloat = true
+		pos++
+		if pos < inputLen && (l.input[pos] == '+' || l.input[pos] == '-') {
+			pos++
+		}
+		expStart := pos
+		for pos < inputLen && l.input[pos] >= '0' && l.input[pos] <= '9' {
+			pos++
+		}
+		if pos == expStart {
+			return Token{Type: InvalidToken, Value: []byte("无效的指数格式: 缺少指数数字"), Pos: startPos}
+		}
+	}
+
+	if !hasDigits {
+		return Token{Type: InvalidToken, Value: []byte("无效的数字格式"), Pos: startPos}
+	}
+
+	// 保存原始字节
+	raw := l.input[start:pos]
+	l.pos = pos
+
 	if isFloat {
-		return Token{Type: FloatToken, FloatValue: n, Pos: startPos}
+		// 使用 strconv.ParseFloat 保证精度
+		n, err := strconv.ParseFloat(bytesToString(raw), 64)
+		if err != nil {
+			return Token{Type: InvalidToken, Value: []byte("浮点数解析失败: " + err.Error()), Pos: startPos}
+		}
+		return Token{Type: FloatToken, FloatValue: n, RawNumber: raw, Pos: startPos}
 	}
 
-	return Token{Type: IntegerToken, FloatValue: n, Pos: startPos}
+	// 整数：先尝试快速解析（零分配），失败再回退 strconv
+	if n, ok := parseInt64Fast(raw); ok {
+		return Token{Type: IntegerToken, IntValue: n, FloatValue: float64(n), RawNumber: raw, IsInteger: true, Pos: startPos}
+	}
+	// 快速解析失败（溢出或无效），用 float64
+	fn, ferr := strconv.ParseFloat(bytesToString(raw), 64)
+	if ferr != nil {
+		return Token{Type: InvalidToken, Value: []byte("数字解析失败"), Pos: startPos}
+	}
+	return Token{Type: IntegerToken, FloatValue: fn, RawNumber: raw, IsInteger: true, Pos: startPos}
 }

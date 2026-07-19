@@ -1,8 +1,10 @@
 package sjson
 
 import (
+	"encoding/base64"
 	"reflect"
 	"unicode/utf8"
+	"unsafe"
 )
 
 // 预分配的 Unicode 控制字符转义表
@@ -83,6 +85,65 @@ func (e stringEncoder) appendToBytes(stream *encoderStream, src reflect.Value) e
 	return encodeStringDirect(stream, src.String())
 }
 
+// stringNeedsEscapeSWAR 使用 SWAR（SIMD within a register）技术一次检查 8 字节
+// 检测是否有需要转义的字符（< 0x20, ", \）
+//
+//go:inline
+func stringNeedsEscapeSWAR(s string) bool {
+	n := len(s)
+	if n == 0 {
+		return false
+	}
+
+	// 8 字节批量检测
+	for n >= 8 {
+		chunk := stringChunk64(s)
+		// 检测引号 (0x22)
+		if hasBytes8(chunk, 0x2222222222222222) {
+			return true
+		}
+		// 检测反斜杠 (0x5C)
+		if hasBytes8(chunk, 0x5C5C5C5C5C5C5C5C) {
+			return true
+		}
+		// 检测控制字符 (< 0x20) 或非 ASCII (>= 0x80)
+		// hasControlChars8 用 (chunk - 0x20) & 0x80 检测：
+		//   - 字节 < 0x20: 减 0x20 后借位，高位置 1
+		//   - 字节 >= 0x80: 减 0x20 后高位仍为 1
+		// 两者都需要逐字节处理，因此统一返回 true
+		if hasControlChars8(chunk) {
+			// 需要区分：真正的控制字符 vs 非 ASCII
+			// 非 ASCII 字符不需要转义（如果是合法 UTF-8），但需要逐字节检查
+			// 控制字符需要转义
+			// 这里保守返回 true，进入逐字节路径
+			return true
+		}
+		s = s[8:]
+		n -= 8
+	}
+
+	// 尾部逐字节处理剩余 0-7 字节
+	for i := 0; i < n; i++ {
+		c := s[i]
+		if c >= 0x80 {
+			// 非 ASCII 字符需要逐字节处理
+			return true
+		}
+		if !safeSet[c] {
+			return true
+		}
+	}
+
+	return false
+}
+
+// stringChunk64 读取字符串前 8 字节为 uint64
+//
+//go:inline
+func stringChunk64(s string) uint64 {
+	return *(*uint64)(unsafe.Pointer(unsafe.StringData(s)))
+}
+
 // encodeStringDirect 直接编码字符串，避免反射
 //
 //go:inline
@@ -92,14 +153,8 @@ func encodeStringDirect(stream *encoderStream, s string) error {
 		return nil
 	}
 
-	// 快速路径：检查是否需要转义
-	needsEscape := false
-	for i := 0; i < len(s); i++ {
-		if s[i] < utf8.RuneSelf && !safeSet[s[i]] {
-			needsEscape = true
-			break
-		}
-	}
+	// OPT-3: SWAR 快速路径——一次检测 8 字节判断是否需要转义
+	needsEscape := stringNeedsEscapeSWAR(s)
 
 	if !needsEscape {
 		// 无需转义，直接添加
@@ -155,17 +210,15 @@ func encodeStringDirect(stream *encoderStream, s string) error {
 	return nil
 }
 
-// []byte 专用编码器
+// []byte 专用编码器（base64 编码，与 encoding/json 一致）
 type byteSliceEncoder struct{}
 
-// 为byteSliceEncoder添加appendToBytes方法
 func (e byteSliceEncoder) appendToBytes(stream *encoderStream, src reflect.Value) error {
 	if src.IsNil() {
 		stream.buffer = append(stream.buffer, nullString...)
 		return nil
 	}
 
-	// 编码字节切片为JSON字符串
 	b := src.Bytes()
 	if len(b) == 0 {
 		stream.buffer = append(stream.buffer, emptyString...)
@@ -173,23 +226,8 @@ func (e byteSliceEncoder) appendToBytes(stream *encoderStream, src reflect.Value
 	}
 
 	stream.buffer = append(stream.buffer, '"')
-
-	for i := 0; i < len(b); {
-		if c := b[i]; c < utf8.RuneSelf {
-			if safeSet[c] {
-				stream.buffer = append(stream.buffer, c)
-			} else {
-				stream.buffer = escapeStringToBytes(stream.buffer, c)
-			}
-			i++
-		} else {
-			// 处理非ASCII字符（UTF-8）
-			_, size := utf8.DecodeRune(b[i:])
-			stream.buffer = append(stream.buffer, b[i:i+size]...)
-			i += size
-		}
-	}
-
+	enc := base64.StdEncoding.EncodeToString(b)
+	stream.buffer = append(stream.buffer, enc...)
 	stream.buffer = append(stream.buffer, '"')
 	return nil
 }

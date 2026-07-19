@@ -54,27 +54,34 @@ func (d *Decoder) decodeArray(dst reflect.Value) error {
 	return fmt.Errorf("无法将数组解码到 %s 类型", dst.Type())
 }
 
+// 预定义的精确类型，用于快速路径的类型安全检查（避免命名类型如 type MyInt int 误入快路径）
+var (
+	exactIntType     = reflect.TypeOf(0)
+	exactStringType  = reflect.TypeOf("")
+	exactFloat64Type = reflect.TypeOf(float64(0))
+)
+
 // 解码到切片
 func (d *Decoder) decodeSlice(dst reflect.Value) error {
 	elemType := dst.Type().Elem()
 
-	// 快速路径：[]interface{} 类型
+	// 快速路径：[]interface{} 类型（要求精确的 interface{}，无自定义方法）
 	if elemType.Kind() == reflect.Interface && elemType.NumMethod() == 0 {
 		return d.decodeInterfaceSliceFast(dst)
 	}
 
-	// 快速路径：[]int 类型
-	if elemType.Kind() == reflect.Int {
+	// 快速路径：[]int 类型（精确类型匹配，排除 type MyInt int 等命名类型）
+	if elemType == exactIntType {
 		return d.decodeIntSlice(dst)
 	}
 
-	// 快速路径：[]string 类型
-	if elemType.Kind() == reflect.String {
+	// 快速路径：[]string 类型（精确类型匹配）
+	if elemType == exactStringType {
 		return d.decodeStringSlice(dst)
 	}
 
-	// 快速路径：[]float64 类型
-	if elemType.Kind() == reflect.Float64 {
+	// 快速路径：[]float64 类型（精确类型匹配）
+	if elemType == exactFloat64Type {
 		return d.decodeFloat64Slice(dst)
 	}
 
@@ -102,17 +109,17 @@ func (d *Decoder) decodeInterfaceSliceFast(dst reflect.Value) error {
 		*elements = append(*elements, element)
 
 		// 检查分隔符
-		if d.token.Type == CommaToken {
-			d.nextToken()
-		} else if d.token.Type == RightBracketToken {
-			d.nextToken()
-			break
-		} else {
+		switch d.consumeStructDelimiter(']') {
+		case 0:
+		case 1:
+			goto done1
+		default:
 			interfaceSlicePool.Put(elements)
 			return fmt.Errorf("数组中意外的标记: %v", d.token)
 		}
 	}
 
+done1:
 	// 复制结果
 	result := make([]interface{}, len(*elements))
 	copy(result, *elements)
@@ -137,16 +144,16 @@ func (d *Decoder) decodeIntSlice(dst reflect.Value) error {
 		d.nextToken()
 
 		// 检查分隔符
-		if d.token.Type == CommaToken {
-			d.nextToken()
-		} else if d.token.Type == RightBracketToken {
-			d.nextToken()
-			break
-		} else {
+		switch d.consumeStructDelimiter(']') {
+		case 0:
+		case 1:
+			goto done
+		default:
 			return fmt.Errorf("数组中意外的标记: %v", d.token)
 		}
 	}
 
+done:
 	dst.Set(reflect.ValueOf(result))
 	return nil
 }
@@ -163,16 +170,17 @@ func (d *Decoder) decodeStringSlice(dst reflect.Value) error {
 		result = append(result, bytesToString(d.token.Value))
 		d.nextToken()
 
-		if d.token.Type == CommaToken {
-			d.nextToken()
-		} else if d.token.Type == RightBracketToken {
-			d.nextToken()
-			break
-		} else {
+		// 检查分隔符
+		switch d.consumeStructDelimiter(']') {
+		case 0:
+		case 1:
+			goto done2
+		default:
 			return fmt.Errorf("数组中意外的标记: %v", d.token)
 		}
 	}
 
+done2:
 	dst.Set(reflect.ValueOf(result))
 	return nil
 }
@@ -189,16 +197,17 @@ func (d *Decoder) decodeFloat64Slice(dst reflect.Value) error {
 		result = append(result, d.token.FloatValue)
 		d.nextToken()
 
-		if d.token.Type == CommaToken {
-			d.nextToken()
-		} else if d.token.Type == RightBracketToken {
-			d.nextToken()
-			break
-		} else {
+		// 检查分隔符
+		switch d.consumeStructDelimiter(']') {
+		case 0:
+		case 1:
+			goto done3
+		default:
 			return fmt.Errorf("数组中意外的标记: %v", d.token)
 		}
 	}
 
+done3:
 	dst.Set(reflect.ValueOf(result))
 	return nil
 }
@@ -263,17 +272,17 @@ func (d *Decoder) decodePtrStructSlice(dst reflect.Value, elemType reflect.Type)
 		n++
 
 		// 检查分隔符
-		if d.token.Type == CommaToken {
-			d.nextToken()
+		switch d.consumeStructDelimiter(']') {
+		case 0:
 			continue
+		case 1:
+			goto done4
+		default:
+			return fmt.Errorf("数组中意外的标记: %v", d.token)
 		}
-		if d.token.Type == RightBracketToken {
-			d.nextToken()
-			break
-		}
-		return fmt.Errorf("数组中意外的标记: %v", d.token)
 	}
 
+done4:
 	// 如果比原来短，清理尾部以避免保留旧指针
 	if oldLen > n {
 		for i := n; i < oldLen; i++ {
@@ -302,16 +311,16 @@ func (d *Decoder) decodeSliceGeneric(dst reflect.Value, elemType reflect.Type) e
 		*elemValues = append(*elemValues, elem)
 
 		// 检查分隔符
-		if d.token.Type == CommaToken {
-			d.nextToken()
-		} else if d.token.Type == RightBracketToken {
-			d.nextToken() // 跳过右方括号
-			break
-		} else {
+		switch d.consumeStructDelimiter(']') {
+		case 0:
+		case 1:
+			goto done5
+		default:
 			return fmt.Errorf("数组中意外的标记: %v", d.token)
 		}
 	}
 
+done5:
 	// 创建最终切片
 	length := len(*elemValues)
 	sliceValue := reflect.MakeSlice(dst.Type(), length, length)
@@ -343,12 +352,12 @@ func (d *Decoder) decodeFixedArray(dst reflect.Value) error {
 		}
 
 		// 检查分隔符
-		if d.token.Type == CommaToken {
-			d.nextToken()
-		} else if d.token.Type == RightBracketToken {
-			d.nextToken() // 跳过右方括号
+		// OPT-2: 使用 peekByte 快速检测
+		switch d.consumeStructDelimiter(']') {
+		case 0:
+		case 1:
 			return nil
-		} else {
+		default:
 			return fmt.Errorf("数组中意外的标记: %v", d.token)
 		}
 	}
@@ -360,12 +369,12 @@ func (d *Decoder) decodeFixedArray(dst reflect.Value) error {
 		}
 
 		// 检查分隔符
-		if d.token.Type == CommaToken {
-			d.nextToken()
-		} else if d.token.Type == RightBracketToken {
-			d.nextToken() // 跳过右方括号
+		// OPT-2: 使用 peekByte 快速检测
+		switch d.consumeStructDelimiter(']') {
+		case 0:
+		case 1:
 			return nil
-		} else {
+		default:
 			return fmt.Errorf("数组中意外的标记: %v", d.token)
 		}
 	}
@@ -389,17 +398,17 @@ func (d *Decoder) decodeInterfaceArray(dst reflect.Value) error {
 		*elements = append(*elements, element)
 
 		// 检查分隔符
-		if d.token.Type == CommaToken {
-			d.nextToken()
-		} else if d.token.Type == RightBracketToken {
-			d.nextToken() // 跳过右方括号
-			break
-		} else {
+		switch d.consumeStructDelimiter(']') {
+		case 0:
+		case 1:
+			goto done6
+		default:
 			interfaceSlicePool.Put(elements)
 			return fmt.Errorf("数组中意外的标记: %v", d.token)
 		}
 	}
 
+done6:
 	// 复制结果
 	result := make([]interface{}, len(*elements))
 	copy(result, *elements)

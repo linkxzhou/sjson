@@ -446,3 +446,126 @@ func isAllDigits4(chunk uint32) bool {
 
 	return mask == 0 && underflow == 0
 }
+
+// parseInt64Fast parses a base-10 int64 directly from byte slice.
+// Returns (value, true) on success, (0, false) on overflow or invalid input.
+// Uses SWAR 4-byte batch processing for speed, avoids string allocation.
+//
+//go:inline
+func parseInt64Fast(b []byte) (int64, bool) {
+	lenB := len(b)
+	if lenB == 0 {
+		return 0, false
+	}
+
+	var negative bool
+	i := 0
+	if b[0] == '-' {
+		negative = true
+		i = 1
+	} else if b[0] == '+' {
+		i = 1
+	}
+
+	if i >= lenB {
+		return 0, false
+	}
+
+	var n uint64
+	// SWAR: batch 4 digits at a time
+	for i+4 <= lenB {
+		chunk := *(*uint32)(unsafe.Pointer(&b[i]))
+		if !isAllDigits4(chunk) {
+			break
+		}
+		d1 := uint64(b[i] - '0')
+		d2 := uint64(b[i+1] - '0')
+		d3 := uint64(b[i+2] - '0')
+		d4 := uint64(b[i+3] - '0')
+		if n > (math.MaxUint64-d1*1000-d2*100-d3*10-d4)/10000 {
+			return 0, false // overflow
+		}
+		n = n*10000 + d1*1000 + d2*100 + d3*10 + d4
+		i += 4
+	}
+
+	for ; i < lenB; i++ {
+		c := b[i]
+		if c < '0' || c > '9' {
+			return 0, false
+		}
+		v := uint64(c - '0')
+		if n > (math.MaxUint64-v)/10 {
+			return 0, false // overflow
+		}
+		n = n*10 + v
+	}
+
+	if negative {
+		if n > uint64(1)<<63 {
+			return 0, false
+		}
+		if n == uint64(1)<<63 {
+			return math.MinInt64, true
+		}
+		return -int64(n), true
+	}
+	if n > math.MaxInt64 {
+		return 0, false
+	}
+	return int64(n), true
+}
+
+// parseUint64Fast parses a base-10 uint64 directly from byte slice.
+// Returns (value, true) on success, (0, false) on overflow or invalid input.
+// Rejects negative numbers (leading '-').
+//
+//go:inline
+func parseUint64Fast(b []byte) (uint64, bool) {
+	lenB := len(b)
+	if lenB == 0 {
+		return 0, false
+	}
+
+	i := 0
+	if b[0] == '-' {
+		return 0, false
+	}
+	if b[0] == '+' {
+		i = 1
+	}
+
+	if i >= lenB {
+		return 0, false
+	}
+
+	var n uint64
+	for i+4 <= lenB {
+		chunk := *(*uint32)(unsafe.Pointer(&b[i]))
+		if !isAllDigits4(chunk) {
+			break
+		}
+		d1 := uint64(b[i] - '0')
+		d2 := uint64(b[i+1] - '0')
+		d3 := uint64(b[i+2] - '0')
+		d4 := uint64(b[i+3] - '0')
+		if n > (math.MaxUint64-d1*1000-d2*100-d3*10-d4)/10000 {
+			return 0, false
+		}
+		n = n*10000 + d1*1000 + d2*100 + d3*10 + d4
+		i += 4
+	}
+
+	for ; i < lenB; i++ {
+		c := b[i]
+		if c < '0' || c > '9' {
+			return 0, false
+		}
+		v := uint64(c - '0')
+		if n > (math.MaxUint64-v)/10 {
+			return 0, false
+		}
+		n = n*10 + v
+	}
+	return n, true
+}

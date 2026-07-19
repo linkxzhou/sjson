@@ -78,6 +78,28 @@ func (d *Decoder) nextToken() {
 	d.token = d.lexer.NextToken()
 }
 
+// consumeStructDelimiter 检查并消费结构分隔符（, 或 } 或 ]）
+// 返回: 0 = 逗号（继续）, 1 = 右括号（结束）, -1 = 错误
+// 此时 d.token 已经是逗号或右括号（由 decodeValue 的 nextToken 读取）
+//
+//go:inline
+func (d *Decoder) consumeStructDelimiter(closeChar byte) int {
+	if d.token.Type == CommaToken {
+		d.nextToken()
+		return 0 // 继续
+	}
+	// closeChar '}' → RightBraceToken, ']' → RightBracketToken
+	expectedType := RightBraceToken
+	if closeChar == ']' {
+		expectedType = RightBracketToken
+	}
+	if d.token.Type == expectedType {
+		d.nextToken()
+		return 1 // 结束
+	}
+	return -1 // 错误
+}
+
 // 直接解码到目标对象
 func (d *Decoder) Decode(v interface{}) error {
 	rv := reflect.ValueOf(v)
