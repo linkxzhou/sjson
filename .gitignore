@@ -11,8 +11,6 @@
 **/__pycache__
 **/build
 **/.env
-**/tests/JSONTestSuite
-**/tests/example
 bench_report.html
 .session_tmps
 .thumbs

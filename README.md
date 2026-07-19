@@ -419,3 +419,37 @@ BenchmarkCompareMedium/SjsonMarshal-14           	11975430	       285.4 ns/op	  
 BenchmarkCompareMedium/StdMarshal-14             	13872591	       262.0 ns/op	     216 B/op	       2 allocs/op
 BenchmarkCompareMedium/JsoniterMarshal-14        	14179768	       256.7 ns/op	     216 B/op	       2 allocs/op
 ```
+
+---
+
+## 附录
+
+以下文档包含更详细的开发记录、优化方案与测试报告，均位于本仓库内（相对路径）。
+
+### 开发与优化文档
+
+| 文档 | 说明 |
+|------|------|
+| [PLAN.md](PLAN.md) | 功能完整性与性能改进计划，记录数值解析、null/指针语义、流式解析、错误处理等核心修复 |
+| [OPTIMIZATION_PLAN.md](OPTIMIZATION_PLAN.md) | 性能优化计划，含 8 项优化（OPT-1 ~ OPT-8）：unsafe 字段偏移、SWAR 转义检测、内联 Token 消费、快速整数解析、buffer pool、二分查找字段匹配、Opcode 解释器、ShapeSig 特化 |
+| [README_BENCH.md](README_BENCH.md) | 详细性能对比报告，含 lexer、编码器、解码器各阶段基准测试数据 |
+
+### 测试报告
+
+| 文档 | 说明 |
+|------|------|
+| [tests/JSONTestSuite_report.md](tests/JSONTestSuite_report.md) | [nst/JSONTestSuite](https://github.com/nst/JSONTestSuite) 兼容性测试报告，318 个用例（y_/n_/i_）逐条结果，sjson 与 encoding/json 行为 100% 一致 |
+
+### JSON 兼容性测试
+
+本项目使用 [nst/JSONTestSuite](https://github.com/nst/JSONTestSuite) 作为 RFC 8259 兼容性测试套件：
+
+```bash
+# 首次需克隆测试套件
+cd tests && git clone https://github.com/nst/JSONTestSuite.git
+
+# 运行兼容性测试（318 个用例）
+cd .. && go test -run TestJSONTestSuite -v -count=1
+```
+
+测试结果：**318/318 符合预期**（y_ 必须接受 95/95，n_ 必须拒绝 188/188，i_ 实现定义 35/35），sjson 与标准库 `encoding/json` 在所有 y_/n_ 用例上行为完全一致。
