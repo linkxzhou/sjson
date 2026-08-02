@@ -140,7 +140,14 @@ func (d *Decoder) decodeIntSlice(dst reflect.Value) error {
 			return fmt.Errorf("期望数字，得到: %v", d.token)
 		}
 
-		result = append(result, int(d.token.FloatValue))
+		// 优先使用 IntValue（零分配），未设置时才用 FloatValue
+		var n int
+		if d.token.Type == IntegerToken && d.token.IsInteger {
+			n = int(d.token.IntValue)
+		} else {
+			n = int(d.token.FloatValue)
+		}
+		result = append(result, n)
 		d.nextToken()
 
 		// 检查分隔符

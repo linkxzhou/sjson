@@ -288,10 +288,11 @@ func (d *Decoder) decodeValue(dst reflect.Value) error {
 
 	case IntegerToken, FloatToken:
 		value := d.token.FloatValue
-		raw := d.token.RawNumber
+		intValue := d.token.IntValue
+		raw := d.token.Value
 		isInt := d.token.IsInteger
 		d.nextToken()
-		return d.decodeNumber(value, raw, isInt, dst)
+		return d.decodeNumber(value, intValue, raw, isInt, dst)
 
 	case LeftBraceToken:
 		return d.decodeObject(dst)
@@ -597,19 +598,18 @@ func (d *Decoder) decodeBool(value bool, dst reflect.Value) error {
 }
 
 // 解码数字
-func (d *Decoder) decodeNumber(value float64, raw []byte, isInteger bool, dst reflect.Value) error {
+//
+// 关键优化：lexer 阶段已对有效整数计算过 IntValue，这里直接复用（isInteger=true 时），
+// 命中快速路径时**不再做任何 ParseInt 调用**，避免原始实现中数字被解析两遍的问题。
+// 注意：调用方在 nextToken 前捕获 value/intValue/raw/isInteger，函数内不得再读 d.token。
+func (d *Decoder) decodeNumber(value float64, intValue int64, raw []byte, isInteger bool, dst reflect.Value) error {
 
 	switch dst.Kind() {
 	case reflect.Interface:
 		if dst.NumMethod() == 0 {
 			if isInteger && raw != nil {
-				// 优先用 int64 快速解析
-				if n, ok := parseInt64Fast(raw); ok {
-					dst.Set(reflect.ValueOf(n))
-					return nil
-				}
-				// 溢出 int64，用 float64
-				dst.Set(reflect.ValueOf(value))
+				// 优先用 lexer 已算好的 IntValue（零分配）
+				dst.Set(reflect.ValueOf(intValue))
 				return nil
 			}
 			dst.Set(reflect.ValueOf(value))
@@ -617,19 +617,19 @@ func (d *Decoder) decodeNumber(value float64, raw []byte, isInteger bool, dst re
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if raw != nil {
-			n, ok := parseInt64Fast(raw)
+			n, ok := intValue, isInteger
 			if !ok {
-				// 可能是浮点数字符串（如 1.5）或溢出，回退 strconv
-				n2, err := strconv.ParseInt(bytesToString(raw), 10, 64)
+				// 可能是浮点原始字节（如 1.5）或 int64 溢出，回退 strconv
+				rawStr := bytesToString(raw)
+				n2, err := strconv.ParseInt(rawStr, 10, 64)
 				if err != nil {
-					// 可能是浮点数字符串（如 1.5）转整数
-					f, ferr := strconv.ParseFloat(bytesToString(raw), 64)
+					f, ferr := strconv.ParseFloat(rawStr, 64)
 					if ferr != nil {
-						return fmt.Errorf("无法将 %s 解码到 %s: %v", bytesToString(raw), dst.Type(), err)
+						return fmt.Errorf("无法将 %s 解码到 %s: %v", rawStr, dst.Type(), err)
 					}
 					// 拒绝小数转整数（与 encoding/json 行为一致：返回错误）
 					if f != float64(int64(f)) {
-						return fmt.Errorf("无法将浮点数 %s 截断为整数 %s", bytesToString(raw), dst.Type())
+						return fmt.Errorf("无法将浮点数 %s 截断为整数 %s", rawStr, dst.Type())
 					}
 					n2 = int64(f)
 				}
@@ -649,13 +649,11 @@ func (d *Decoder) decodeNumber(value float64, raw []byte, isInteger bool, dst re
 			if len(raw) > 0 && raw[0] == '-' {
 				return fmt.Errorf("无法将负数 %s 解码到 %s", bytesToString(raw), dst.Type())
 			}
-			n, ok := parseUint64Fast(raw)
+			n, ok := uint64(intValue), isInteger
 			if !ok {
-				// 回退 strconv
 				rawStr := bytesToString(raw)
 				n2, err := strconv.ParseUint(rawStr, 10, 64)
 				if err != nil {
-					// 可能是浮点数字符串
 					f, ferr := strconv.ParseFloat(rawStr, 64)
 					if ferr != nil {
 						return fmt.Errorf("无法将 %s 解码到 %s: %v", rawStr, dst.Type(), err)

@@ -51,7 +51,15 @@ func estimateJSONSize(v interface{}) int {
 	case []int:
 		return len(val)*8 + 16
 	default:
-		return 512 // 默认大小增大
+		// struct / 其他类型：用 reflect 估算字段数
+		rv := reflect.ValueOf(v)
+		if rv.Kind() == reflect.Ptr {
+			rv = rv.Elem()
+		}
+		if rv.Kind() == reflect.Struct {
+			return rv.NumField()*16 + 32
+		}
+		return 512
 	}
 }
 
@@ -83,6 +91,24 @@ func Marshal(v interface{}) ([]byte, error) {
 	releaseEncoderStream(stream)
 
 	return result, nil
+}
+
+// AppendMarshal 将 v 编码为 JSON 并追加到 dst 后面，返回追加后的切片。
+// 允许调用方复用自己的缓冲区，避免 Marshal 每次固定的 make+copy 分配
+// （对应 OPTIMIZATION_REVIEW.md §1.4 提到的"编码侧唯一剩下的分配来源"）。
+func AppendMarshal(dst []byte, v interface{}) ([]byte, error) {
+	estimatedSize := estimateJSONSize(v)
+	stream := getEncoderStreamWithSize(estimatedSize)
+
+	err := encodeValueToBytes(stream, reflect.ValueOf(v), reflect.TypeOf(v))
+	if err != nil {
+		releaseEncoderStream(stream)
+		return dst, err
+	}
+
+	dst = append(dst, stream.buffer...)
+	releaseEncoderStream(stream)
+	return dst, nil
 }
 
 // MarshalString 使用直接编码模式将Go对象编码为JSON字符串

@@ -386,6 +386,23 @@ func appendUintOptimized(dst []byte, u uint64) []byte {
 	return dst
 }
 
+// head8 将字节切片的前 8 字节按小端序加载为 uint64，不足 8 字节时高位补零。
+// 与长度组成 (len, head) 二元组可做字段名快速等值比较（jsoniter/sonic 同款技巧）：
+// len<=8 时一次 uint64 相等比较即可精确判定，>8 时才需追加 bytes.Equal 校验。
+//
+//go:inline
+func head8(b []byte) uint64 {
+	n := len(b)
+	if n >= 8 {
+		return *(*uint64)(unsafe.Pointer(unsafe.SliceData(b)))
+	}
+	var u uint64
+	for i := 0; i < n; i++ {
+		u |= uint64(b[i]) << (8 * i)
+	}
+	return u
+}
+
 // 检查8字节中是否包含指定字节
 //
 //go:nosplit
@@ -399,52 +416,60 @@ func hasBytes8(chunk uint64, pattern uint64) bool {
 }
 
 // 检查8字节中是否包含控制字符 (< 0x20)
+// 无借位污染版本：正确拒绝所有非 ASCII (>= 0x80) 字节。
+// 判据：存在字节 b < 0x20 等价于 ((b - 0x20) & ~b & 0x80) != 0
+//  - b < 0x20: 减 0x20 借位，~b 高位 1，AND 后高位 1
+//  - b >= 0x20: 减 0x20 不借位或借用正常位，~b 高位 0，AND 后该位置 0
+//  - b >= 0x80: 减 0x20 后高位 1（>0x80），但 ~b 高位 0，AND 后该位置 0
 //
 //go:nosplit
 func hasControlChars8(chunk uint64) bool {
-	// 检查每个字节是否小于0x20
-	// 使用饱和减法技巧
-	return ((chunk - 0x2020202020202020) & 0x8080808080808080) != 0
+	return ((chunk - 0x2020202020202020) & ^chunk & 0x8080808080808080) != 0
 }
 
-// 使用位运算的更高效版本
+// zeroByteMask 检测 uint64 中每个字节是否为 0，返回的 uint64 中零字节对应位置高比特为 1。
 //
-//go:nosplit
+//go:inline
+func zeroByteMask(x uint64) uint64 {
+	const lo = 0x0101010101010101
+	const hi = 0x8080808080808080
+	return (x - lo) & ^x & hi
+}
+
+// isAllWhitespace8 判断 8 字节是否全部为 JSON 空白（空格 0x20 / \t 0x09 / \n 0x0A / \r 0x0D）。
+// 用 SWAR 位运算一次性判定，无逐字节循环、无分支。
+//
+// 原理：对每个目标值 t，chunk XOR broadcast(t) 在 b==t 的字节处产生 0。
+// 用 zeroByteMask 检测零字节位置，4 个目标的检测结果 OR 起来，
+// 若全 8 字节都有至少一个命中，则掩码 == 0x8080808080808080。
+//
+//go:inline
 func isAllWhitespace8(chunk uint64) bool {
-	// 使用查找表方式，将空白字符映射为位掩码
-	// 空格(0x20)=32, 制表符(0x09)=9, 换行(0x0A)=10, 回车(0x0D)=13
-
-	// 创建空白字符的位掩码 (位置9,10,13,32对应的位为1)
-	const whitespaceMask = (1 << 9) | (1 << 10) | (1 << 13) | (1 << 32)
-
-	// 检查每个字节
-	for i := 0; i < 8; i++ {
-		b := byte(chunk >> (i * 8))
-		if b >= 64 || (whitespaceMask&(1<<b)) == 0 {
-			return false
-		}
-	}
-	return true
+	const hi = 0x8080808080808080
+	hit := zeroByteMask(chunk^0x2020202020202020) |
+		zeroByteMask(chunk^0x0909090909090909) |
+		zeroByteMask(chunk^0x0A0A0A0A0A0A0A0A) |
+		zeroByteMask(chunk^0x0D0D0D0D0D0D0D0D)
+	return hit == hi
 }
 
 // 使用位运算的更高效版本
 //
 //go:nosplit
 func isAllDigits4(chunk uint32) bool {
-	// 数字字符范围是 0x30-0x39
-	// 使用位运算技巧：先减去0x30，然后检查是否都小于10
-
-	// 减去 0x30303030 (4个0x30)
-	adjusted := chunk - 0x30303030
-
-	// 检查每个字节是否小于10 (0x0A)
-	// 如果任何字节 >= 10，则对应位会被设置
-	mask := adjusted & 0xF0F0F0F0 // 检查高4位
-
-	// 还需要检查是否有字节小于0x30 (下溢)
-	underflow := (chunk ^ 0x30303030) & 0x80808080
-
-	return mask == 0 && underflow == 0
+	// 数字字符范围是 '0'(0x30) - '9'(0x39)，每个字节都需满足：
+	//   1) 高 4 位 = 0x3   （即 chunk & 0xF0F0F0F0 == 0x30303030）
+	//   2) 低 4 位 <= 0x9   （即 (chunk + 0x06060606) & 0xF0F0F0F0 == 0x30303030）
+	// 无借位污染，正确拒绝 ':' (0x3A) ';' '<' '=' '>' '?' 等临近字符。
+	//
+	// 验证：
+	//   '9' = 0x39 → 0x30 ✓ / 0x3F+0x06=0x45, 0x45&0xF0=0x40 ≠ 0x30 ✗ 正确拒绝是不可能的数字
+	//   实际：
+	//   '9' (0x39): high nibble = 0x3 ✓; '+0x6' = 0x3F, &0xF0 = 0x30 ✓ 通过
+	//   ':' (0x3A): high nibble = 0x3 ✓; '+0x6' = 0x40, &0xF0 = 0x40 ✗ 正确拒绝
+	//   '/' (0x2F): high nibble = 0x2 ✗ 直接拒绝
+	return (chunk & 0xF0F0F0F0) == 0x30303030 &&
+		(chunk+0x06060606)&0xF0F0F0F0 == 0x30303030
 }
 
 // parseInt64Fast parses a base-10 int64 directly from byte slice.

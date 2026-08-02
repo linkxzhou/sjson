@@ -215,27 +215,10 @@ done3:
 	return nil
 }
 
-// 缓存结构体字段映射：值为 fields 切片中的下标（不是 reflect 字段索引）
-var fieldMapCache = sync.Map{} // map[reflect.Type]map[string]int
-
 // 缓存结构体字段的大小写不敏感映射，仅在精确匹配失败时作为兜底使用
 // （与 encoding/json 行为一致：优先精确匹配，找不到再尝试大小写不敏感匹配）
+// 注：精确匹配已改为 (len, head8) 比较（见 decodeStruct），不再需要 map 版本的精确字段映射。
 var fieldMapCaseInsensitiveCache = sync.Map{} // map[reflect.Type]map[string]int
-
-// 获取字段映射（带缓存），值为 fields 切片下标
-func getFieldMap(structType reflect.Type, fields []structField) map[string]int {
-	if cachedMap, ok := fieldMapCache.Load(structType); ok {
-		return cachedMap.(map[string]int)
-	}
-
-	fieldMap := make(map[string]int, len(fields))
-	for i, field := range fields {
-		fieldMap[bytesToString(field.name)] = i
-	}
-
-	fieldMapCache.Store(structType, fieldMap)
-	return fieldMap
-}
 
 // 获取大小写不敏感的字段映射（带缓存）
 func getFieldMapCaseInsensitive(structType reflect.Type, fields []structField) map[string]int {
@@ -263,16 +246,6 @@ func (d *Decoder) decodeStruct(dst reflect.Value) error {
 	// 预先获取所有字段信息，避免重复查找
 	fields := getStructFields(structType)
 
-	// 小结构体（字段很少）走线性匹配：避免 sync.Map + map 哈希开销
-	// 这类结构体在很多真实 payload 中占比很高（例如 BenchmarkCompareMedium）。
-	useLinearScan := len(fields) <= 8
-
-	// OPT-6: 字段数 > 8 时用预排序二分查找替代 map，避免 bytesToString 分配
-	var sorted *sortedFields
-	if !useLinearScan {
-		sorted = getSortedFields(structType, fields)
-	}
-
 	for {
 		// 键必须是字符串
 		if d.token.Type != StringToken {
@@ -288,18 +261,28 @@ func (d *Decoder) decodeStruct(dst reflect.Value) error {
 		}
 		d.nextToken()
 
+		// (len, head8) 二元组等值比较（jsoniter/sonic 同款）：
+		// 大多数字段名 <= 8 字节，一次 uint64 比较即可判定，零 memcmp、零函数调用；
+		// 取代原先的线性 bytes.Equal 扫描与排序二分查找（含额外的 sync.Map.Load）。
+		keyLen := len(keyBytes)
+		keyHead := head8(keyBytes)
 		fieldPos := -1
-		if useLinearScan {
-			// 线性扫描：字段数很少时通常比 map 查找更快
+		if keyLen <= 8 {
 			for i := range fields {
-				if bytes.Equal(fields[i].name, keyBytes) {
+				if fields[i].nameLen == keyLen && fields[i].nameHead == keyHead {
 					fieldPos = i
 					break
 				}
 			}
 		} else {
-			// OPT-6: 二分查找，直接对 []byte 比较，零 string 分配
-			fieldPos = searchFieldBinary(sorted, keyBytes)
+			// >8 字节：(len, head) 匹配后仍需 bytes.Equal 排除前缀碰撞
+			for i := range fields {
+				if fields[i].nameLen == keyLen && fields[i].nameHead == keyHead &&
+					bytes.Equal(fields[i].name, keyBytes) {
+					fieldPos = i
+					break
+				}
+			}
 		}
 
 		// 精确匹配失败时，尝试大小写不敏感兜底匹配（与 encoding/json 行为一致）
@@ -314,7 +297,7 @@ func (d *Decoder) decodeStruct(dst reflect.Value) error {
 		if fieldPos >= 0 {
 			// 字段存在，解码值
 			field := &fields[fieldPos]
-			fv := fieldByUnsafeOffset(dst, field.offset, field.index, field.typ)
+			fv := fieldByIndex(dst, field.index)
 			if err := d.decodeValue(fv); err != nil {
 				return fmt.Errorf("解码字段 %s 出错: %w", bytesToString(keyBytes), err)
 			}

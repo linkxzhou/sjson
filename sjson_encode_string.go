@@ -88,6 +88,10 @@ func (e stringEncoder) appendToBytes(stream *encoderStream, src reflect.Value) e
 // stringNeedsEscapeSWAR 使用 SWAR（SIMD within a register）技术一次检查 8 字节
 // 检测是否有需要转义的字符（< 0x20, ", \）
 //
+// 非 ASCII (>= 0x80) 字符视为安全：合法 UTF-8 多字节序列在慢路径中
+// 通过 utf8.DecodeRuneInString 直接透传，不需要任何转义。因此含中文/emoji
+// 的字符串可直接命中 fast path 走 append(s...) 一次性写出。
+//
 //go:inline
 func stringNeedsEscapeSWAR(s string) bool {
 	n := len(s)
@@ -106,16 +110,8 @@ func stringNeedsEscapeSWAR(s string) bool {
 		if hasBytes8(chunk, 0x5C5C5C5C5C5C5C5C) {
 			return true
 		}
-		// 检测控制字符 (< 0x20) 或非 ASCII (>= 0x80)
-		// hasControlChars8 用 (chunk - 0x20) & 0x80 检测：
-		//   - 字节 < 0x20: 减 0x20 后借位，高位置 1
-		//   - 字节 >= 0x80: 减 0x20 后高位仍为 1
-		// 两者都需要逐字节处理，因此统一返回 true
+		// 检测真正的控制字符 (< 0x20)，无借位污染版本不会误判非 ASCII
 		if hasControlChars8(chunk) {
-			// 需要区分：真正的控制字符 vs 非 ASCII
-			// 非 ASCII 字符不需要转义（如果是合法 UTF-8），但需要逐字节检查
-			// 控制字符需要转义
-			// 这里保守返回 true，进入逐字节路径
 			return true
 		}
 		s = s[8:]
@@ -125,11 +121,8 @@ func stringNeedsEscapeSWAR(s string) bool {
 	// 尾部逐字节处理剩余 0-7 字节
 	for i := 0; i < n; i++ {
 		c := s[i]
-		if c >= 0x80 {
-			// 非 ASCII 字符需要逐字节处理
-			return true
-		}
-		if !safeSet[c] {
+		// 任何 >= 0x80 字节在此视为安全；控制字符（< 0x20）由 safeSet 拦截
+		if c < 0x80 && !safeSet[c] {
 			return true
 		}
 	}

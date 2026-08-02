@@ -106,20 +106,20 @@
 
 | 文件 | sjson | sjson错误 | stdlib | stdlib错误 | sjson符合预期 |
 |------|-------|----------|--------|-----------|---------------|
-| n_array_1_true_without_comma.json | ✗ | 数组中意外的标记: {6 0 0 false [116 114 117 101] [] ... | ✗ | invalid character 't' after array element | ✓ |
+| n_array_1_true_without_comma.json | ✗ | 数组中意外的标记: {6 0 0 false [116 114 117 101] 3} | ✗ | invalid character 't' after array element | ✓ |
 | n_array_a_invalid_utf8.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'a' looking for beginning of value | ✓ |
-| n_array_colon_instead_of_comma.json | ✗ | 数组中意外的标记: {9 0 0 false [58] [] 3} | ✗ | invalid character ':' after array element | ✓ |
-| n_array_comma_after_close.json | ✗ | JSON解析完成后存在多余内容: {8 0 0 false [44] [] ... | ✗ | invalid character ',' after top-level value | ✓ |
+| n_array_colon_instead_of_comma.json | ✗ | 数组中意外的标记: {9 0 0 false [58] 3} | ✗ | invalid character ':' after array element | ✓ |
+| n_array_comma_after_close.json | ✗ | JSON解析完成后存在多余内容: {8 0 0 false [44] 4} | ✗ | invalid character ',' after top-level value | ✓ |
 | n_array_comma_and_number.json | ✗ | 无法识别的JSON token类型: 8 | ✗ | invalid character ',' looking for beginning of value | ✓ |
 | n_array_double_comma.json | ✗ | 无法识别的JSON token类型: 8 | ✗ | invalid character ',' looking for beginning of value | ✓ |
 | n_array_double_extra_comma.json | ✗ | 无法识别的JSON token类型: 8 | ✗ | invalid character ',' looking for beginning of value | ✓ |
-| n_array_extra_close.json | ✗ | JSON解析完成后存在多余内容: {13 0 0 false [93] []... | ✗ | invalid character ']' after top-level value | ✓ |
+| n_array_extra_close.json | ✗ | JSON解析完成后存在多余内容: {13 0 0 false [93] 5} | ✗ | invalid character ']' after top-level value | ✓ |
 | n_array_extra_comma.json | ✗ | 无法识别的JSON token类型: 13 | ✗ | invalid character ']' looking for beginning of value | ✓ |
-| n_array_incomplete.json | ✗ | 数组中意外的标记: {1 0 0 false [] [] 4} | ✗ | unexpected end of JSON input | ✓ |
+| n_array_incomplete.json | ✗ | 数组中意外的标记: {1 0 0 false [] 4} | ✗ | unexpected end of JSON input | ✓ |
 | n_array_incomplete_invalid_value.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'x' looking for beginning of value | ✓ |
-| n_array_inner_array_no_comma.json | ✗ | 数组中意外的标记: {12 0 0 false [91] [] 2} | ✗ | invalid character '[' after array element | ✓ |
+| n_array_inner_array_no_comma.json | ✗ | 数组中意外的标记: {12 0 0 false [91] 2} | ✗ | invalid character '[' after array element | ✓ |
 | n_array_invalid_utf8.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'ÿ' looking for beginning of value | ✓ |
-| n_array_items_separated_by_semicolon.json | ✗ | 数组中意外的标记: {9 0 0 false [58] [] 2} | ✗ | invalid character ':' after array element | ✓ |
+| n_array_items_separated_by_semicolon.json | ✗ | 数组中意外的标记: {9 0 0 false [58] 2} | ✗ | invalid character ':' after array element | ✓ |
 | n_array_just_comma.json | ✗ | 无法识别的JSON token类型: 8 | ✗ | invalid character ',' looking for beginning of value | ✓ |
 | n_array_just_minus.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ']' in numeric literal | ✓ |
 | n_array_missing_value.json | ✗ | 无法识别的JSON token类型: 8 | ✗ | invalid character ',' looking for beginning of value | ✓ |
@@ -128,24 +128,24 @@
 | n_array_number_and_several_commas.json | ✗ | 无法识别的JSON token类型: 8 | ✗ | invalid character ',' looking for beginning of value | ✓ |
 | n_array_spaces_vertical_tab_formfeed.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '\v' in string literal | ✓ |
 | n_array_star_inside.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '*' looking for beginning of value | ✓ |
-| n_array_unclosed.json | ✗ | 数组中意外的标记: {1 0 0 false [] [] 3} | ✗ | unexpected end of JSON input | ✓ |
+| n_array_unclosed.json | ✗ | 数组中意外的标记: {1 0 0 false [] 3} | ✗ | unexpected end of JSON input | ✓ |
 | n_array_unclosed_trailing_comma.json | ✗ | 无法识别的JSON token类型: 1 | ✗ | unexpected end of JSON input | ✓ |
-| n_array_unclosed_with_new_lines.json | ✗ | 数组中意外的标记: {1 0 0 false [] [] 8} | ✗ | unexpected end of JSON input | ✓ |
-| n_array_unclosed_with_object_inside.json | ✗ | 数组中意外的标记: {1 0 0 false [] [] 3} | ✗ | unexpected end of JSON input | ✓ |
+| n_array_unclosed_with_new_lines.json | ✗ | 数组中意外的标记: {1 0 0 false [] 8} | ✗ | unexpected end of JSON input | ✓ |
+| n_array_unclosed_with_object_inside.json | ✗ | 数组中意外的标记: {1 0 0 false [] 3} | ✗ | unexpected end of JSON input | ✓ |
 | n_incomplete_false.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ']' in literal false (expecting 'e') | ✓ |
 | n_incomplete_null.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ']' in literal null (expecting 'l') | ✓ |
 | n_incomplete_true.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ']' in literal true (expecting 'e') | ✓ |
-| n_multidigit_number_then_00.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [0] [] 3... | ✗ | invalid character '\x00' after top-level value | ✓ |
+| n_multidigit_number_then_00.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [0] 3} | ✗ | invalid character '\x00' after top-level value | ✓ |
 | n_number_++.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '+' looking for beginning of value | ✓ |
 | n_number_+1.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '+' looking for beginning of value | ✓ |
 | n_number_+Inf.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '+' looking for beginning of value | ✓ |
-| n_number_-01.json | ✗ | 数组中意外的标记: {2 1 1 true [] [49] 3} | ✗ | invalid character '1' after array element | ✓ |
-| n_number_-1.0..json | ✗ | 数组中意外的标记: {0 0 0 false [46] [] 5} | ✗ | invalid character '.' after array element | ✓ |
+| n_number_-01.json | ✗ | 数组中意外的标记: {2 1 1 true [49] 3} | ✗ | invalid character '1' after array element | ✓ |
+| n_number_-1.0..json | ✗ | 数组中意外的标记: {0 0 0 false [46] 5} | ✗ | invalid character '.' after array element | ✓ |
 | n_number_-2..json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ']' after decimal point in numeric literal | ✓ |
 | n_number_-NaN.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'N' in numeric literal | ✓ |
 | n_number_.-1.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '.' looking for beginning of value | ✓ |
 | n_number_.2e-3.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '.' looking for beginning of value | ✓ |
-| n_number_0.1.2.json | ✗ | 数组中意外的标记: {0 0 0 false [46] [] 4} | ✗ | invalid character '.' after array element | ✓ |
+| n_number_0.1.2.json | ✗ | 数组中意外的标记: {0 0 0 false [46] 4} | ✗ | invalid character '.' after array element | ✓ |
 | n_number_0.3e+.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ']' in exponent of numeric literal | ✓ |
 | n_number_0.3e.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ']' in exponent of numeric literal | ✓ |
 | n_number_0.e1.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'e' after decimal point in numeric literal | ✓ |
@@ -156,7 +156,7 @@
 | n_number_1.0e+.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ']' in exponent of numeric literal | ✓ |
 | n_number_1.0e-.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ']' in exponent of numeric literal | ✓ |
 | n_number_1.0e.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ']' in exponent of numeric literal | ✓ |
-| n_number_1_000.json | ✗ | 数组中意外的标记: {2 0 0 true [] [48] 3} | ✗ | invalid character '0' after array element | ✓ |
+| n_number_1_000.json | ✗ | 数组中意外的标记: {2 0 0 true [48] 3} | ✗ | invalid character '0' after array element | ✓ |
 | n_number_1eE2.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'E' in exponent of numeric literal | ✓ |
 | n_number_2.e+3.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'e' after decimal point in numeric literal | ✓ |
 | n_number_2.e-3.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'e' after decimal point in numeric literal | ✓ |
@@ -165,56 +165,56 @@
 | n_number_Inf.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'I' looking for beginning of value | ✓ |
 | n_number_NaN.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'N' looking for beginning of value | ✓ |
 | n_number_U+FF11_fullwidth_digit_one.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'ï' looking for beginning of value | ✓ |
-| n_number_expression.json | ✗ | 数组中意外的标记: {0 0 0 false [43] [] 2} | ✗ | invalid character '+' after array element | ✓ |
-| n_number_hex_1_digit.json | ✗ | 数组中意外的标记: {0 0 0 false [120] [] 2} | ✗ | invalid character 'x' after array element | ✓ |
-| n_number_hex_2_digits.json | ✗ | 数组中意外的标记: {0 0 0 false [120] [] 2} | ✗ | invalid character 'x' after array element | ✓ |
+| n_number_expression.json | ✗ | 数组中意外的标记: {0 0 0 false [43] 2} | ✗ | invalid character '+' after array element | ✓ |
+| n_number_hex_1_digit.json | ✗ | 数组中意外的标记: {0 0 0 false [120] 2} | ✗ | invalid character 'x' after array element | ✓ |
+| n_number_hex_2_digits.json | ✗ | 数组中意外的标记: {0 0 0 false [120] 2} | ✗ | invalid character 'x' after array element | ✓ |
 | n_number_infinity.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'I' looking for beginning of value | ✓ |
 | n_number_invalid+-.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '-' in exponent of numeric literal | ✓ |
-| n_number_invalid-negative-real.json | ✗ | 数组中意外的标记: {0 0 0 false [102] [] 9} | ✗ | invalid character 'f' after array element | ✓ |
-| n_number_invalid-utf-8-in-bigger-int.json | ✗ | 数组中意外的标记: {0 0 0 false [229] [] 4} | ✗ | invalid character 'å' after array element | ✓ |
-| n_number_invalid-utf-8-in-exponent.json | ✗ | 数组中意外的标记: {0 0 0 false [229] [] 4} | ✗ | invalid character 'å' after array element | ✓ |
-| n_number_invalid-utf-8-in-int.json | ✗ | 数组中意外的标记: {0 0 0 false [229] [] 2} | ✗ | invalid character 'å' after array element | ✓ |
+| n_number_invalid-negative-real.json | ✗ | 数组中意外的标记: {0 0 0 false [102] 9} | ✗ | invalid character 'f' after array element | ✓ |
+| n_number_invalid-utf-8-in-bigger-int.json | ✗ | 数组中意外的标记: {0 0 0 false [229] 4} | ✗ | invalid character 'å' after array element | ✓ |
+| n_number_invalid-utf-8-in-exponent.json | ✗ | 数组中意外的标记: {0 0 0 false [229] 4} | ✗ | invalid character 'å' after array element | ✓ |
+| n_number_invalid-utf-8-in-int.json | ✗ | 数组中意外的标记: {0 0 0 false [229] 2} | ✗ | invalid character 'å' after array element | ✓ |
 | n_number_minus_infinity.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'I' in numeric literal | ✓ |
 | n_number_minus_sign_with_trailing_garbage.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'f' in numeric literal | ✓ |
 | n_number_minus_space_1.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ' ' in numeric literal | ✓ |
-| n_number_neg_int_starting_with_zero.json | ✗ | 数组中意外的标记: {2 12 12 true [] [49 50] 3} | ✗ | invalid character '1' after array element | ✓ |
+| n_number_neg_int_starting_with_zero.json | ✗ | 数组中意外的标记: {2 12 12 true [49 50] 3} | ✗ | invalid character '1' after array element | ✓ |
 | n_number_neg_real_without_int_part.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '.' in numeric literal | ✓ |
-| n_number_neg_with_garbage_at_end.json | ✗ | 数组中意外的标记: {0 0 0 false [120] [] 3} | ✗ | invalid character 'x' after array element | ✓ |
+| n_number_neg_with_garbage_at_end.json | ✗ | 数组中意外的标记: {0 0 0 false [120] 3} | ✗ | invalid character 'x' after array element | ✓ |
 | n_number_real_garbage_after_e.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'a' in exponent of numeric literal | ✓ |
 | n_number_real_with_invalid_utf8_after_e.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'å' in exponent of numeric literal | ✓ |
 | n_number_real_without_fractional_part.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ']' after decimal point in numeric literal | ✓ |
 | n_number_starting_with_dot.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '.' looking for beginning of value | ✓ |
-| n_number_with_alpha.json | ✗ | 数组中意外的标记: {0 0 0 false [97] [] 4} | ✗ | invalid character 'a' after array element | ✓ |
-| n_number_with_alpha_char.json | ✗ | 数组中意外的标记: {0 0 0 false [72] [] 19} | ✗ | invalid character 'H' after array element | ✓ |
-| n_number_with_leading_zero.json | ✗ | 数组中意外的标记: {2 12 12 true [] [49 50] 2} | ✗ | invalid character '1' after array element | ✓ |
+| n_number_with_alpha.json | ✗ | 数组中意外的标记: {0 0 0 false [97] 4} | ✗ | invalid character 'a' after array element | ✓ |
+| n_number_with_alpha_char.json | ✗ | 数组中意外的标记: {0 0 0 false [72] 19} | ✗ | invalid character 'H' after array element | ✓ |
+| n_number_with_leading_zero.json | ✗ | 数组中意外的标记: {2 12 12 true [49 50] 2} | ✗ | invalid character '1' after array element | ✓ |
 | n_object_bad_value.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 't' in literal true (expecting 'e') | ✓ |
-| n_object_bracket_key.json | ✗ | 对象键必须是字符串，得到: {12 0 0 false [91] [] ... | ✗ | invalid character '[' looking for beginning of object key st... | ✓ |
-| n_object_comma_instead_of_colon.json | ✗ | 对象键后面必须是冒号，得到: {8 0 0 false [44] [... | ✗ | invalid character ',' after object key | ✓ |
+| n_object_bracket_key.json | ✗ | 对象键必须是字符串，得到: {12 0 0 false [91] 1} | ✗ | invalid character '[' looking for beginning of object key st... | ✓ |
+| n_object_comma_instead_of_colon.json | ✗ | 对象键后面必须是冒号，得到: {8 0 0 false [44] 4... | ✗ | invalid character ',' after object key | ✓ |
 | n_object_double_colon.json | ✗ | 无法识别的JSON token类型: 9 | ✗ | invalid character ':' looking for beginning of value | ✓ |
-| n_object_emoji.json | ✗ | 对象键必须是字符串，得到: {0 0 0 false [240] [] ... | ✗ | invalid character 'ð' looking for beginning of object key s... | ✓ |
-| n_object_garbage_at_end.json | ✗ | 对象中意外的标记: {2 123 123 true [] [49 50 51] 9} | ✗ | invalid character '1' after object key:value pair | ✓ |
-| n_object_key_with_single_quotes.json | ✗ | 对象键必须是字符串，得到: {0 0 0 false [107] [] ... | ✗ | invalid character 'k' looking for beginning of object key st... | ✓ |
-| n_object_lone_continuation_byte_in_key_and_trailing_comma.json | ✗ | 对象键必须是字符串，得到: {11 0 0 false [125] []... | ✗ | invalid character '}' looking for beginning of object key st... | ✓ |
-| n_object_missing_colon.json | ✗ | 对象键后面必须是冒号，得到: {0 0 0 false [98] [... | ✗ | invalid character 'b' after object key | ✓ |
-| n_object_missing_key.json | ✗ | 对象键必须是字符串，得到: {9 0 0 false [58] [] 1... | ✗ | invalid character ':' looking for beginning of object key st... | ✓ |
-| n_object_missing_semicolon.json | ✗ | 对象键后面必须是冒号，得到: {4 0 0 false [98] [... | ✗ | invalid character '"' after object key | ✓ |
+| n_object_emoji.json | ✗ | 对象键必须是字符串，得到: {0 0 0 false [240] 1} | ✗ | invalid character 'ð' looking for beginning of object key s... | ✓ |
+| n_object_garbage_at_end.json | ✗ | 对象中意外的标记: {2 123 123 true [49 50 51] 9} | ✗ | invalid character '1' after object key:value pair | ✓ |
+| n_object_key_with_single_quotes.json | ✗ | 对象键必须是字符串，得到: {0 0 0 false [107] 1} | ✗ | invalid character 'k' looking for beginning of object key st... | ✓ |
+| n_object_lone_continuation_byte_in_key_and_trailing_comma.json | ✗ | 对象键必须是字符串，得到: {11 0 0 false [125] 9} | ✗ | invalid character '}' looking for beginning of object key st... | ✓ |
+| n_object_missing_colon.json | ✗ | 对象键后面必须是冒号，得到: {0 0 0 false [98] 5... | ✗ | invalid character 'b' after object key | ✓ |
+| n_object_missing_key.json | ✗ | 对象键必须是字符串，得到: {9 0 0 false [58] 1} | ✗ | invalid character ':' looking for beginning of object key st... | ✓ |
+| n_object_missing_semicolon.json | ✗ | 对象键后面必须是冒号，得到: {4 0 0 false [98] 5... | ✗ | invalid character '"' after object key | ✓ |
 | n_object_missing_value.json | ✗ | 无法识别的JSON token类型: 1 | ✗ | unexpected end of JSON input | ✓ |
-| n_object_no-colon.json | ✗ | 对象键后面必须是冒号，得到: {1 0 0 false [] [] ... | ✗ | unexpected end of JSON input | ✓ |
-| n_object_non_string_key.json | ✗ | 对象键必须是字符串，得到: {2 1 1 true [] [49] 1} | ✗ | invalid character '1' looking for beginning of object key st... | ✓ |
+| n_object_no-colon.json | ✗ | 对象键后面必须是冒号，得到: {1 0 0 false [] 4} | ✗ | unexpected end of JSON input | ✓ |
+| n_object_non_string_key.json | ✗ | 对象键必须是字符串，得到: {2 1 1 true [49] 1} | ✗ | invalid character '1' looking for beginning of object key st... | ✓ |
 | n_object_non_string_key_but_huge_number_instead.json | ✗ | 对象键必须是字符串，得到: {0 0 0 false [230 181 ... | ✗ | invalid character '9' looking for beginning of object key st... | ✓ |
 | n_object_repeated_null_null.json | ✗ | 对象键必须是字符串，得到: {5 0 0 false [110 117 ... | ✗ | invalid character 'n' looking for beginning of object key st... | ✓ |
-| n_object_several_trailing_commas.json | ✗ | 对象键必须是字符串，得到: {8 0 0 false [44] [] 8... | ✗ | invalid character ',' looking for beginning of object key st... | ✓ |
-| n_object_single_quote.json | ✗ | 对象键必须是字符串，得到: {0 0 0 false [39] [] 1... | ✗ | invalid character '\'' looking for beginning of object key s... | ✓ |
-| n_object_trailing_comma.json | ✗ | 对象键必须是字符串，得到: {11 0 0 false [125] []... | ✗ | invalid character '}' looking for beginning of object key st... | ✓ |
-| n_object_trailing_comment.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [47] [] ... | ✗ | invalid character '/' after top-level value | ✓ |
-| n_object_trailing_comment_open.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [47] [] ... | ✗ | invalid character '/' after top-level value | ✓ |
-| n_object_trailing_comment_slash_open.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [47] [] ... | ✗ | invalid character '/' after top-level value | ✓ |
-| n_object_trailing_comment_slash_open_incomplete.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [47] [] ... | ✗ | invalid character '/' after top-level value | ✓ |
-| n_object_two_commas_in_a_row.json | ✗ | 对象键必须是字符串，得到: {8 0 0 false [44] [] 9... | ✗ | invalid character ',' looking for beginning of object key st... | ✓ |
-| n_object_unquoted_key.json | ✗ | 对象键必须是字符串，得到: {0 0 0 false [97] [] 1... | ✗ | invalid character 'a' looking for beginning of object key st... | ✓ |
+| n_object_several_trailing_commas.json | ✗ | 对象键必须是字符串，得到: {8 0 0 false [44] 8} | ✗ | invalid character ',' looking for beginning of object key st... | ✓ |
+| n_object_single_quote.json | ✗ | 对象键必须是字符串，得到: {0 0 0 false [39] 1} | ✗ | invalid character '\'' looking for beginning of object key s... | ✓ |
+| n_object_trailing_comma.json | ✗ | 对象键必须是字符串，得到: {11 0 0 false [125] 8} | ✗ | invalid character '}' looking for beginning of object key st... | ✓ |
+| n_object_trailing_comment.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [47] 9} | ✗ | invalid character '/' after top-level value | ✓ |
+| n_object_trailing_comment_open.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [47] 9} | ✗ | invalid character '/' after top-level value | ✓ |
+| n_object_trailing_comment_slash_open.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [47] 9} | ✗ | invalid character '/' after top-level value | ✓ |
+| n_object_trailing_comment_slash_open_incomplete.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [47] 9} | ✗ | invalid character '/' after top-level value | ✓ |
+| n_object_two_commas_in_a_row.json | ✗ | 对象键必须是字符串，得到: {8 0 0 false [44] 9} | ✗ | invalid character ',' looking for beginning of object key st... | ✓ |
+| n_object_unquoted_key.json | ✗ | 对象键必须是字符串，得到: {0 0 0 false [97] 1} | ✗ | invalid character 'a' looking for beginning of object key st... | ✓ |
 | n_object_unterminated-value.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | unexpected end of JSON input | ✓ |
 | n_object_with_single_string.json | ✗ | 对象键后面必须是冒号，得到: {11 0 0 false [125]... | ✗ | invalid character '}' after object key | ✓ |
-| n_object_with_trailing_garbage.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [35] [] ... | ✗ | invalid character '#' after top-level value | ✓ |
+| n_object_with_trailing_garbage.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [35] 9} | ✗ | invalid character '#' after top-level value | ✓ |
 | n_single_space.json | ✗ | 无法识别的JSON token类型: 1 | ✗ | unexpected end of JSON input | ✓ |
 | n_string_1_surrogate_then_escape.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | unexpected end of JSON input | ✓ |
 | n_string_1_surrogate_then_escape_u.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '"' in \u hexadecimal character escape | ✓ |
@@ -244,53 +244,53 @@
 | n_string_unescaped_newline.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '\n' in string literal | ✓ |
 | n_string_unescaped_tab.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '\t' in string literal | ✓ |
 | n_string_unicode_CapitalU.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'U' in string escape code | ✓ |
-| n_string_with_trailing_garbage.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [120] []... | ✗ | invalid character 'x' after top-level value | ✓ |
+| n_string_with_trailing_garbage.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [120] 2} | ✗ | invalid character 'x' after top-level value | ✓ |
 | n_structure_100000_opening_arrays.json | ✗ | 无法识别的JSON token类型: 1 | ✗ | invalid character '[' exceeded max depth | ✓ |
 | n_structure_U+2060_word_joined.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'â' looking for beginning of value | ✓ |
 | n_structure_UTF8_BOM_no_data.json | ✗ | 无法识别的JSON token类型: 1 | ✗ | unexpected end of JSON input | ✓ |
 | n_structure_angle_bracket_..json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '<' looking for beginning of value | ✓ |
 | n_structure_angle_bracket_null.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '<' looking for beginning of value | ✓ |
-| n_structure_array_trailing_garbage.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [120] []... | ✗ | invalid character 'x' after top-level value | ✓ |
-| n_structure_array_with_extra_array_close.json | ✗ | JSON解析完成后存在多余内容: {13 0 0 false [93] []... | ✗ | invalid character ']' after top-level value | ✓ |
+| n_structure_array_trailing_garbage.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [120] 3} | ✗ | invalid character 'x' after top-level value | ✓ |
+| n_structure_array_with_extra_array_close.json | ✗ | JSON解析完成后存在多余内容: {13 0 0 false [93] 3} | ✗ | invalid character ']' after top-level value | ✓ |
 | n_structure_array_with_unclosed_string.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | unexpected end of JSON input | ✓ |
 | n_structure_ascii-unicode-identifier.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'a' looking for beginning of value | ✓ |
 | n_structure_capitalized_True.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'T' looking for beginning of value | ✓ |
-| n_structure_close_unopened_array.json | ✗ | JSON解析完成后存在多余内容: {13 0 0 false [93] []... | ✗ | invalid character ']' after top-level value | ✓ |
-| n_structure_comma_instead_of_closing_brace.json | ✗ | 对象键必须是字符串，得到: {1 0 0 false [] [] 11} | ✗ | unexpected end of JSON input | ✓ |
-| n_structure_double_array.json | ✗ | JSON解析完成后存在多余内容: {12 0 0 false [91] []... | ✗ | invalid character '[' after top-level value | ✓ |
+| n_structure_close_unopened_array.json | ✗ | JSON解析完成后存在多余内容: {13 0 0 false [93] 1} | ✗ | invalid character ']' after top-level value | ✓ |
+| n_structure_comma_instead_of_closing_brace.json | ✗ | 对象键必须是字符串，得到: {1 0 0 false [] 11} | ✗ | unexpected end of JSON input | ✓ |
+| n_structure_double_array.json | ✗ | JSON解析完成后存在多余内容: {12 0 0 false [91] 2} | ✗ | invalid character '[' after top-level value | ✓ |
 | n_structure_end_array.json | ✗ | 无法识别的JSON token类型: 13 | ✗ | invalid character ']' looking for beginning of value | ✓ |
 | n_structure_incomplete_UTF8_BOM.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'ï' looking for beginning of value | ✓ |
 | n_structure_lone-invalid-utf-8.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'å' looking for beginning of value | ✓ |
 | n_structure_lone-open-bracket.json | ✗ | 无法识别的JSON token类型: 1 | ✗ | unexpected end of JSON input | ✓ |
 | n_structure_no_data.json | ✗ | 无法识别的JSON token类型: 1 | ✗ | unexpected end of JSON input | ✓ |
 | n_structure_null-byte-outside-string.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '\x00' looking for beginning of value | ✓ |
-| n_structure_number_with_trailing_garbage.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [64] [] ... | ✗ | invalid character '@' after top-level value | ✓ |
-| n_structure_object_followed_by_closing_object.json | ✗ | JSON解析完成后存在多余内容: {11 0 0 false [125] [... | ✗ | invalid character '}' after top-level value | ✓ |
+| n_structure_number_with_trailing_garbage.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [64] 1} | ✗ | invalid character '@' after top-level value | ✓ |
+| n_structure_object_followed_by_closing_object.json | ✗ | JSON解析完成后存在多余内容: {11 0 0 false [125] 2... | ✗ | invalid character '}' after top-level value | ✓ |
 | n_structure_object_unclosed_no_value.json | ✗ | 无法识别的JSON token类型: 1 | ✗ | unexpected end of JSON input | ✓ |
 | n_structure_object_with_comment.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '/' looking for beginning of value | ✓ |
-| n_structure_object_with_trailing_garbage.json | ✗ | JSON解析完成后存在多余内容: {4 0 0 false [120] []... | ✗ | invalid character '"' after top-level value | ✓ |
+| n_structure_object_with_trailing_garbage.json | ✗ | JSON解析完成后存在多余内容: {4 0 0 false [120] 12... | ✗ | invalid character '"' after top-level value | ✓ |
 | n_structure_open_array_apostrophe.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '\'' looking for beginning of value | ✓ |
 | n_structure_open_array_comma.json | ✗ | 无法识别的JSON token类型: 8 | ✗ | invalid character ',' looking for beginning of value | ✓ |
 | n_structure_open_array_object.json | ✗ | 无法识别的JSON token类型: 1 | ✗ | invalid character '[' exceeded max depth | ✓ |
-| n_structure_open_array_open_object.json | ✗ | 对象键必须是字符串，得到: {1 0 0 false [] [] 2} | ✗ | unexpected end of JSON input | ✓ |
+| n_structure_open_array_open_object.json | ✗ | 对象键必须是字符串，得到: {1 0 0 false [] 2} | ✗ | unexpected end of JSON input | ✓ |
 | n_structure_open_array_open_string.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | unexpected end of JSON input | ✓ |
-| n_structure_open_array_string.json | ✗ | 数组中意外的标记: {1 0 0 false [] [] 4} | ✗ | unexpected end of JSON input | ✓ |
-| n_structure_open_object.json | ✗ | 对象键必须是字符串，得到: {1 0 0 false [] [] 1} | ✗ | unexpected end of JSON input | ✓ |
-| n_structure_open_object_close_array.json | ✗ | 对象键必须是字符串，得到: {13 0 0 false [93] [] ... | ✗ | invalid character ']' looking for beginning of object key st... | ✓ |
-| n_structure_open_object_comma.json | ✗ | 对象键必须是字符串，得到: {8 0 0 false [44] [] 1... | ✗ | invalid character ',' looking for beginning of object key st... | ✓ |
-| n_structure_open_object_open_array.json | ✗ | 对象键必须是字符串，得到: {12 0 0 false [91] [] ... | ✗ | invalid character '[' looking for beginning of object key st... | ✓ |
+| n_structure_open_array_string.json | ✗ | 数组中意外的标记: {1 0 0 false [] 4} | ✗ | unexpected end of JSON input | ✓ |
+| n_structure_open_object.json | ✗ | 对象键必须是字符串，得到: {1 0 0 false [] 1} | ✗ | unexpected end of JSON input | ✓ |
+| n_structure_open_object_close_array.json | ✗ | 对象键必须是字符串，得到: {13 0 0 false [93] 1} | ✗ | invalid character ']' looking for beginning of object key st... | ✓ |
+| n_structure_open_object_comma.json | ✗ | 对象键必须是字符串，得到: {8 0 0 false [44] 1} | ✗ | invalid character ',' looking for beginning of object key st... | ✓ |
+| n_structure_open_object_open_array.json | ✗ | 对象键必须是字符串，得到: {12 0 0 false [91] 1} | ✗ | invalid character '[' looking for beginning of object key st... | ✓ |
 | n_structure_open_object_open_string.json | ✗ | 对象键必须是字符串，得到: {0 0 0 false [230 156 ... | ✗ | unexpected end of JSON input | ✓ |
-| n_structure_open_object_string_with_apostrophes.json | ✗ | 对象键必须是字符串，得到: {0 0 0 false [39] [] 1... | ✗ | invalid character '\'' looking for beginning of object key s... | ✓ |
+| n_structure_open_object_string_with_apostrophes.json | ✗ | 对象键必须是字符串，得到: {0 0 0 false [39] 1} | ✗ | invalid character '\'' looking for beginning of object key s... | ✓ |
 | n_structure_open_open.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '{' in string escape code | ✓ |
 | n_structure_single_eacute.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'é' looking for beginning of value | ✓ |
 | n_structure_single_star.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '*' looking for beginning of value | ✓ |
-| n_structure_trailing_#.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [35] [] ... | ✗ | invalid character '#' after top-level value | ✓ |
+| n_structure_trailing_#.json | ✗ | JSON解析完成后存在多余内容: {0 0 0 false [35] 9} | ✗ | invalid character '#' after top-level value | ✓ |
 | n_structure_uescaped_LF_before_string.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '\\' looking for beginning of value | ✓ |
-| n_structure_unclosed_array.json | ✗ | 数组中意外的标记: {1 0 0 false [] [] 2} | ✗ | unexpected end of JSON input | ✓ |
+| n_structure_unclosed_array.json | ✗ | 数组中意外的标记: {1 0 0 false [] 2} | ✗ | unexpected end of JSON input | ✓ |
 | n_structure_unclosed_array_partial_null.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ' ' in literal null (expecting 'l') | ✓ |
 | n_structure_unclosed_array_unfinished_false.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ' ' in literal false (expecting 'e') | ✓ |
 | n_structure_unclosed_array_unfinished_true.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character ' ' in literal true (expecting 'e') | ✓ |
-| n_structure_unclosed_object.json | ✗ | 对象中意外的标记: {1 0 0 false [] [] 12} | ✗ | unexpected end of JSON input | ✓ |
+| n_structure_unclosed_object.json | ✗ | 对象中意外的标记: {1 0 0 false [] 12} | ✗ | unexpected end of JSON input | ✓ |
 | n_structure_unicode-identifier.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'Ã' looking for beginning of value | ✓ |
 | n_structure_whitespace_U+2060_word_joiner.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character 'â' looking for beginning of value | ✓ |
 | n_structure_whitespace_formfeed.json | ✗ | 无法识别的JSON token类型: 0 | ✗ | invalid character '\f' looking for beginning of value | ✓ |

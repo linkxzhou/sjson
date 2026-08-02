@@ -69,6 +69,19 @@ func shapeSignature(fields []structField) uint64 {
 }
 
 func opcodeForType(t reflect.Type) structOpcode {
+	// 关键修复：具名类型（如 type Celsius float64）即使 Kind() 是标量，
+	// 也可能实现了 json.Marshaler / encoding.TextMarshaler，必须调用其
+	// 自定义方法而不能按裸类型直写内存，否则会产出与 encoding/json 不一致的结果。
+	// （§1.7 指出的"ShapeSig 只能表达形状、无法表达真实类型"问题在此处的具体体现）
+	if t.Implements(jsonMarshalerType) || t.Implements(textMarshalerType) {
+		return opFallback
+	}
+	if t.Kind() != reflect.Ptr {
+		pt := reflect.PointerTo(t)
+		if pt.Implements(jsonMarshalerType) || pt.Implements(textMarshalerType) {
+			return opFallback
+		}
+	}
 	switch t.Kind() {
 	case reflect.Bool:
 		return opBool

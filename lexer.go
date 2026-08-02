@@ -44,12 +44,11 @@ var (
 
 // Token 表示一个词法标记
 type Token struct {
-	Type       TokenType
+	Type      TokenType
 	FloatValue float64
 	IntValue   int64
 	IsInteger  bool
-	Value      []byte
-	RawNumber  []byte // 数字 token 的原始字节，用于精确转换
+	Value      []byte // 字符串值 / 数字原始字节（合并原 RawNumber，省 24B slice header）
 	Pos        int
 }
 
@@ -357,6 +356,10 @@ func (l *Lexer) lexStringEscape(startPos, contentStart int) Token {
 }
 
 // lexNumber 解析数字标记
+//
+// 注：早期尝试过对 IntegerToken 不计算 FloatValue 以省一次 float64 转换，
+// 但 interface{} 装箱路径依赖 FloatValue（与 encoding/json 保持 float64 一致）；
+// 改为保留 FloatValue，去重只在 decodeNumber 内部做。
 func (l *Lexer) lexNumber() Token {
 	startPos := l.start
 	inputLen := l.inputLen
@@ -428,17 +431,20 @@ func (l *Lexer) lexNumber() Token {
 		if err != nil {
 			return Token{Type: InvalidToken, Value: []byte("浮点数解析失败: " + err.Error()), Pos: startPos}
 		}
-		return Token{Type: FloatToken, FloatValue: n, RawNumber: raw, Pos: startPos}
+		return Token{Type: FloatToken, FloatValue: n, Value: raw, Pos: startPos}
 	}
 
 	// 整数：先尝试快速解析（零分配），失败再回退 strconv
+	// 同步计算 FloatValue 以保持 interface{} 装箱语义与 encoding/json 一致
+	// 注意：IsInteger=true 仅在 IntValue 有效时设置；溢出时置 false，
+	// 解码侧据此回退到 FloatValue / strconv 链（与原行为一致）。
 	if n, ok := parseInt64Fast(raw); ok {
-		return Token{Type: IntegerToken, IntValue: n, FloatValue: float64(n), RawNumber: raw, IsInteger: true, Pos: startPos}
+		return Token{Type: IntegerToken, IntValue: n, FloatValue: float64(n), Value: raw, IsInteger: true, Pos: startPos}
 	}
 	// 快速解析失败（溢出或无效），用 float64
 	fn, ferr := strconv.ParseFloat(bytesToString(raw), 64)
 	if ferr != nil {
 		return Token{Type: InvalidToken, Value: []byte("数字解析失败"), Pos: startPos}
 	}
-	return Token{Type: IntegerToken, FloatValue: fn, RawNumber: raw, IsInteger: true, Pos: startPos}
+	return Token{Type: IntegerToken, FloatValue: fn, Value: raw, IsInteger: false, Pos: startPos}
 }

@@ -193,11 +193,14 @@ func getStructFields(t reflect.Type) []structField {
 			curType = field.Type
 		}
 
+		nameBytes := stringToBytes(rf.name)
 		fields = append(fields, structField{
-			name:      stringToBytes(rf.name),
+			name:      nameBytes,
 			keyBytes:  keyBytes,
 			index:     rf.index,
 			offset:    offset,
+			nameLen:   len(nameBytes),
+			nameHead:  head8(nameBytes),
 			omitempty: rf.omitempty,
 			typ:       rf.typ,
 			encoder:   fieldEncoder,

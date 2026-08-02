@@ -10,9 +10,11 @@ import (
 // offset 为预计算的 unsafe 偏移量（OPT-1），用于绕过 reflect.Value.Field() 开销
 type structField struct {
 	name      []byte
-	keyBytes  []byte // 预计算的键字节："name":
+	keyBytes  []byte // 预计算的键字节："name":"
 	index     []int
 	offset    uintptr // 预计算的 unsafe 偏移量（支持嵌套匿名字段累加）
+	nameLen   int     // 字段名长度，配合 nameHead 做 (len, head) 快速等值比较
+	nameHead  uint64  // 字段名前 8 字节的小端序 uint64（不足 8 字节补零）
 	omitempty bool
 	typ       reflect.Type
 	encoder   Encoder // 预缓存字段编码器
@@ -20,26 +22,16 @@ type structField struct {
 
 // fieldByIndex 根据索引路径获取字段值，支持匿名字段的多级路径
 //
+// 注：曾用 unsafe.Pointer(base+offset) + reflect.NewAt 合成 reflect.Value（OPT-1），
+// 但 reflect.NewAt 内部的 ptrTo 未命中缓存时会分配新 rtype，反而比 Field(i) 更慢
+// 且引入额外分配。offset 仍保留在 structField 上，供 opcode 编码路径直接读写内存。
+//
 //go:inline
 func fieldByIndex(v reflect.Value, index []int) reflect.Value {
 	if len(index) == 1 {
 		return v.Field(index[0])
 	}
 	return v.FieldByIndex(index)
-}
-
-// fieldByUnsafeOffset 通过预计算的偏移量直接访问字段值，绕过 reflect.Value.Field() 的运行时检查
-// 这是 OPT-1 的核心：用 unsafe.Pointer(base + offset) + reflect.NewAt() 构造 reflect.Value
-// 相比 fieldByIndex 可减少每字段 5+ 次内部类型/可设性检查
-// 当值不可寻址时回退到 fieldByIndex 保证安全性
-//
-//go:inline
-func fieldByUnsafeOffset(v reflect.Value, offset uintptr, index []int, typ reflect.Type) reflect.Value {
-	if v.CanAddr() {
-		base := unsafe.Pointer(v.UnsafeAddr())
-		return reflect.NewAt(typ, unsafe.Pointer(uintptr(base)+offset)).Elem()
-	}
-	return fieldByIndex(v, index)
 }
 
 type structEncoder struct {
@@ -91,7 +83,7 @@ func (e *structEncoder) appendToBytes(stream *encoderStream, src reflect.Value) 
 // 单字段编码优化
 func (e *structEncoder) encodeSingleField(stream *encoderStream, src reflect.Value) error {
 	field := e.fields[0]
-	f := fieldByUnsafeOffset(src, field.offset, field.index, field.typ)
+	f := fieldByIndex(src, field.index)
 
 	// 处理omitempty
 	if field.omitempty && isEmptyValue(f) {
@@ -124,7 +116,7 @@ func (e *structEncoder) encodeFieldsFast(stream *encoderStream, src reflect.Valu
 		stream.buffer = append(stream.buffer, field.keyBytes...)
 
 		// 编码字段值
-		f := fieldByUnsafeOffset(src, field.offset, field.index, field.typ)
+		f := fieldByIndex(src, field.index)
 		err := field.encoder.appendToBytes(stream, f)
 		if err != nil {
 			return err
@@ -140,7 +132,7 @@ func (e *structEncoder) encodeFieldsWithOmitEmpty(stream *encoderStream, src ref
 	firstField := true
 
 	for _, field := range e.fields {
-		f := fieldByUnsafeOffset(src, field.offset, field.index, field.typ)
+		f := fieldByIndex(src, field.index)
 
 		// 处理omitempty标签
 		if field.omitempty && isEmptyValue(f) {
