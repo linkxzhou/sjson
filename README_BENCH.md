@@ -303,3 +303,61 @@ BenchmarkUnmarshalCompareTypes/SjsonNestedObject-14   	12173078	      1004 ns/op
 BenchmarkUnmarshalCompareTypes/StdlibNestedObject-14  	 6676039	      1811 ns/op	    1984 B/op	      50 allocs/op
 BenchmarkUnmarshalCompareTypes/JsoniterNestedObject-14         	10289276	      1153 ns/op	    1977 B/op	      58 allocs/op
 ```
+
+## 1. lexer.go性能优化
+第十轮：SWAR 原语修正 + 空白扫描优化（A1/A4）
+BenchmarkLexerSimple-14                                 	52901490	       264.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerComplex-14                                	12666428	       884.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerStringEscapes-14                          	59662347	       187.5 ns/op	      48 B/op	       1 allocs/op
+BenchmarkLexerAllTokens-14                              	 8134942	      1365 ns/op	      64 B/op	       2 allocs/op
+BenchmarkLexerBatchProcessing/单个标记处理-14                  	 8752875	      1452 ns/op	      64 B/op	       2 allocs/op
+BenchmarkLexerNumbers/整数数组-14                            	31794006	       372.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerNumbers/浮点数数组-14                           	33415374	       402.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerNumbers/科学计数法数组-14                         	40901554	       290.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerNumbers/混合数字JSON-14                        	45847826	       263.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkLexerNumbers/大数字数组-14                           	95362753	       121.6 ns/op	       0 B/op	       0 allocs/op
+
+## 3. sjson.go性能优化
+第十轮：字段查找 (len,head8) 优化 + 大小写不敏感零分配兜底（A5 + equalFoldASCII）
+BenchmarkComplexDecode/SjsonDecode-14                    	 6695864	      1883 ns/op	    2035 B/op	      25 allocs/op
+BenchmarkComplexDecode/StdDecode-14                      	 3379279	      3532 ns/op	    2632 B/op	      59 allocs/op
+BenchmarkComplexEncode/SjsonEncode-14                    	 7356444	      1556 ns/op	     992 B/op	      43 allocs/op
+BenchmarkComplexEncode/StdEncode-14                      	 5532892	      2135 ns/op	    1841 B/op	      49 allocs/op
+BenchmarkCompareMedium/SjsonMarshal-14                   	48214400	       249.0 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/StdMarshal-14                     	47046891	       255.4 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/JsoniterMarshal-14                	22450538	       531.0 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/SjsonUnmarshal-14                 	 4633125	      2579 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCompareMedium/StdUnmarshal-14                   	 1283262	      9310 ns/op	     504 B/op	      11 allocs/op
+BenchmarkCompareMedium/JsoniterUnmarshal-14              	 5968567	      2024 ns/op	     352 B/op	      38 allocs/op
+
+## 4. 与其他 JSON 库的性能对比
+第十轮：系统优化后（SWAR/Token缩减/延迟整数解析/字段查找/equalFoldASCII）
+BenchmarkCompareMedium/SjsonMarshal-14                   	48214400	       249.0 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/StdMarshal-14                     	47046891	       255.4 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/JsoniterMarshal-14                	22450538	       531.0 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/SjsonUnmarshal-14                 	 4633125	      2579 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCompareMedium/StdUnmarshal-14                   	 1283262	      9310 ns/op	     504 B/op	      11 allocs/op
+BenchmarkCompareMedium/JsoniterUnmarshal-14              	 5968567	      2024 ns/op	     352 B/op	      38 allocs/op
+
+## 5. byte_utils.go 和 strconv 对比
+第三轮：
+BenchmarkParseIntComparison/parseIntFromBytes-14         	1000000000	        12.46 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParseIntComparison/strconv.ParseInt-14          	501114117	        25.31 ns/op	       0 B/op	       0 allocs/op
+
+BenchmarkParseFloatComparison/parseFloatFromBytes-14     	811190988	        15.00 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParseFloatComparison/strconv.ParseFloat-14      	326660702	        36.33 ns/op	       0 B/op	       0 allocs/op
+
+## 6. 基础类型测试（Unmarshal）
+第四轮：
+BenchmarkUnmarshalCompareTypes/SjsonSimple-14            	166065092	        73.00 ns/op	      24 B/op	       2 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibSimple-14           	100000000	       114.9 ns/op	     176 B/op	       4 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterSimple-14         	147251504	        83.91 ns/op	      40 B/op	       3 allocs/op
+BenchmarkUnmarshalCompareTypes/SjsonSmallObject-14       	50003220	       242.3 ns/op	     368 B/op	       5 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibSmallObject-14      	25752974	       493.0 ns/op	     592 B/op	      14 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterSmallObject-14    	48907245	       246.3 ns/op	     464 B/op	      13 allocs/op
+BenchmarkUnmarshalCompareTypes/SjsonArray-14             	33418708	       365.8 ns/op	     288 B/op	      13 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibArray-14            	14425368	       836.3 ns/op	     760 B/op	      19 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterArray-14          	36059898	       326.9 ns/op	     600 B/op	      16 allocs/op
+BenchmarkUnmarshalCompareTypes/SjsonNestedObject-14      	10733808	      1104 ns/op	    1690 B/op	      29 allocs/op
+BenchmarkUnmarshalCompareTypes/StdlibNestedObject-14     	 6003709	      2044 ns/op	    1984 B/op	      50 allocs/op
+BenchmarkUnmarshalCompareTypes/JsoniterNestedObject-14   	10314693	      1243 ns/op	    1977 B/op	      58 allocs/op

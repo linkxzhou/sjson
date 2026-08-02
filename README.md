@@ -276,8 +276,8 @@ sjson 库的性能目标是接近或超过标准库 `encoding/json`，同时提�
 ### 性能亮点
 
 - **Unmarshal 结构体解码**：与 jsoniter 性能持平，同时保持 **零内存分配**
-- **Marshal 结构体编码**：超越标准库和 jsoniter，性能提升 30%+
-- **内存效率**：解码时零分配，GC 友好
+- **Marshal 结构体编码**：超越标准库和 jsoniter，吞吐量提升 30%+（2022 MB/s vs 513 MB/s）
+- **内存效率**：结构体解码零分配，GC 友好
 
 ### 1. Unmarshal 性能对比图（ns/op）
 
@@ -286,10 +286,10 @@ xychart-beta
     title "JSON Unmarshal 性能对比 (ns/op, 越低越好)"
     x-axis ["Sonic", "StdLib", "Sjson", "Jsoniter"]
     y-axis "时间 (ns/op)" 0 --> 65000
-    bar "Generic" [16059, 61936, 34443, 40309]
-    bar "Binding" [15726, 54445, 20594, 15157]
-    bar "Parallel Generic" [6640, 32191, 24871, 28092]
-    bar "Parallel Binding" [2954, 13227, 6875, 5351]
+    bar "Generic" [15320, 62567, 32703, 35866]
+    bar "Binding" [11745, 57627, 27140, 13642]
+    bar "Parallel Generic" [3888, 21260, 16400, 19266]
+    bar "Parallel Binding" [1805, 11681, 7238, 3702]
 ```
 
 ### 2. Unmarshal 吞吐量对比图（MB/s）
@@ -299,10 +299,10 @@ xychart-beta
     title "JSON Unmarshal 吞吐量对比 (MB/s, 越高越好)"
     x-axis ["Sonic", "StdLib", "Sjson", "Jsoniter"]
     y-axis "吞吐量 (MB/s)" 0 --> 4000
-    bar "Generic" [691.18, 179.22, 322.27, 275.38]
-    bar "Binding" [705.85, 203.88, 539.00, 732.34]
-    bar "Parallel Generic" [1671.67, 344.81, 446.31, 395.12]
-    bar "Parallel Binding" [3758.09, 839.20, 1614.56, 2074.33]
+    bar "Generic" [724.54, 177.41, 339.42, 309.48]
+    bar "Binding" [945.10, 192.62, 408.99, 813.68]
+    bar "Parallel Generic" [2854.79, 522.11, 676.83, 576.14]
+    bar "Parallel Binding" [6150.48, 950.24, 1533.51, 2998.56]
 ```
 
 ### 3. Marshal 性能对比图（ns/op）
@@ -312,10 +312,10 @@ xychart-beta
     title "JSON Marshal 性能对比 (ns/op, 越低越好)"
     x-axis ["Sonic", "StdLib", "Sjson", "Jsoniter"]
     y-axis "时间 (ns/op)" 0 --> 45000
-    bar "Generic" [26953, 40048, 20931, 17234]
-    bar "Binding" [9200, 7528, 5801, 8923]
-    bar "Parallel Generic" [7340, 17688, 10330, 6419]
-    bar "Parallel Binding" [2565, 2398, 2481, 2516]
+    bar "Generic" [27268, 38969, 21867, 28605]
+    bar "Binding" [8507, 7373, 5487, 21617]
+    bar "Parallel Generic" [5735, 14125, 7623, 6610]
+    bar "Parallel Binding" [1770, 2720, 2566, 4115]
 ```
 
 ### 4. Marshal 吞吐量对比图（MB/s）
@@ -325,10 +325,10 @@ xychart-beta
     title "JSON Marshal 吞吐量对比 (MB/s, 越高越好)"
     x-axis ["Sonic", "StdLib", "Sjson", "Jsoniter"]
     y-axis "吞吐量 (MB/s)" 0 --> 5000
-    bar "Generic" [411.84, 277.17, 530.32, 644.09]
-    bar "Binding" [1206.54, 1474.42, 1913.60, 1244.00]
-    bar "Parallel Generic" [1512.26, 627.53, 1074.59, 1729.23]
-    bar "Parallel Binding" [4328.13, 4628.69, 4474.54, 4411.10]
+    bar "Generic" [407.07, 284.85, 507.61, 388.05]
+    bar "Binding" [1304.79, 1505.46, 2022.83, 513.49]
+    bar "Parallel Generic" [1935.47, 785.86, 1456.09, 1679.28]
+    bar "Parallel Binding" [6269.72, 4081.36, 4324.97, 2697.68]
 ```
 
 ### 5. 内存分配对比图（B/op）
@@ -338,10 +338,10 @@ xychart-beta
     title "JSON 处理内存分配对比 (B/op, 越低越好)"
     x-axis ["Sonic", "StdLib", "Sjson", "Jsoniter"]
     y-axis "内存分配 (B/op)" 0 --> 60000
-    bar "Unmarshal Generic" [45513, 49464, 46002, 54388]
-    bar "Unmarshal Binding" [19779, 11416, 9554, 10704]
-    bar "Marshal Generic" [13208, 32904, 19309, 17998]
-    bar "Marshal Binding" [9605, 9479, 9479, 9487]
+    bar "Unmarshal Generic" [43299, 49464, 45991, 54259]
+    bar "Unmarshal Binding" [18270, 11416, 9552, 10608]
+    bar "Marshal Generic" [13192, 32907, 19311, 17999]
+    bar "Marshal Binding" [9567, 9479, 9479, 9487]
 ```
 
 ### 6. 结构体 Unmarshal 零分配对比
@@ -350,9 +350,9 @@ xychart-beta
 
 | 库 | 时间 (ns/op) | 内存分配 (B/op) | 分配次数 (allocs/op) |
 |---|---|---|---|
-| **sjson** | 2129 | **0** | **0** |
-| jsoniter | 2281 | 352 | 38 |
-| 标准库 | 8536 | 504 | 11 |
+| **sjson** | 2584 | **0** | **0** |
+| jsoniter | 2066 | 352 | 38 |
+| 标准库 | 9183 | 504 | 11 |
 
 **sjson 实现了与 jsoniter 持平的性能，同时保持零内存分配！**
 
@@ -365,27 +365,27 @@ pkg: github.com/linkxzhou/sjson
 cpu: Apple M4 Pro
 
 ===== 最新测试结果：
-BenchmarkDecoder_Generic_Sonic-14                	  128037	     16059 ns/op	 691.18 MB/s	   45513 B/op	     106 allocs/op
-BenchmarkDecoder_Generic_StdLib-14               	   37628	     61936 ns/op	 179.22 MB/s	   49464 B/op	     795 allocs/op
-BenchmarkDecoder_Generic_Sjson-14                	   69631	     34443 ns/op	 322.27 MB/s	   46002 B/op	     659 allocs/op
-BenchmarkDecoder_Generic_Jsoniter-14             	   60690	     40309 ns/op	 275.38 MB/s	   54388 B/op	    1091 allocs/op
-BenchmarkDecoder_Binding_Sonic-14                	  148352	     15726 ns/op	 705.85 MB/s	   19779 B/op	      42 allocs/op
-BenchmarkDecoder_Binding_StdLib-14               	   43590	     54445 ns/op	 203.88 MB/s	   11416 B/op	     160 allocs/op
-BenchmarkDecoder_Binding_Sjson-14                	  115108	     20594 ns/op	 539.00 MB/s	    9554 B/op	      63 allocs/op
-BenchmarkDecoder_Binding_Jsoniter-14             	  163153	     15157 ns/op	 732.34 MB/s	   10704 B/op	     145 allocs/op
-BenchmarkDecoder_Parallel_Generic_Sonic-14       	  442612	      6640 ns/op	1671.67 MB/s	   44091 B/op	     106 allocs/op
-BenchmarkDecoder_Parallel_Generic_StdLib-14      	   73695	     32191 ns/op	 344.81 MB/s	   49465 B/op	     795 allocs/op
-BenchmarkDecoder_Parallel_Generic_Sjson-14       	  107665	     24871 ns/op	 446.31 MB/s	   45989 B/op	     659 allocs/op
-BenchmarkDecoder_Parallel_Generic_Jsoniter-14    	   86619	     28092 ns/op	 395.12 MB/s	   54383 B/op	    1091 allocs/op
-BenchmarkDecoder_Parallel_Binding_Sonic-14       	  743667	      2954 ns/op	3758.09 MB/s	   22965 B/op	      42 allocs/op
-BenchmarkDecoder_Parallel_Binding_StdLib-14      	  168904	     13227 ns/op	 839.20 MB/s	   11416 B/op	     160 allocs/op
-BenchmarkDecoder_Parallel_Binding_Sjson-14       	  296032	      6875 ns/op	1614.56 MB/s	    9550 B/op	      63 allocs/op
-BenchmarkDecoder_Parallel_Binding_Jsoniter-14    	  402795	      5351 ns/op	2074.33 MB/s	   10701 B/op	     145 allocs/op
+BenchmarkDecoder_Generic_Sonic-14                	  157986	     15320 ns/op	 724.54 MB/s	   43299 B/op	     106 allocs/op
+BenchmarkDecoder_Generic_StdLib-14               	   38335	     62567 ns/op	 177.41 MB/s	   49464 B/op	     795 allocs/op
+BenchmarkDecoder_Generic_Sjson-14                	   73944	     32703 ns/op	 339.42 MB/s	   45991 B/op	     659 allocs/op
+BenchmarkDecoder_Generic_Jsoniter-14             	   66192	     35866 ns/op	 309.48 MB/s	   54259 B/op	    1085 allocs/op
+BenchmarkDecoder_Binding_Sonic-14                	  209566	     11745 ns/op	 945.10 MB/s	   18270 B/op	      42 allocs/op
+BenchmarkDecoder_Binding_StdLib-14               	   41419	     57627 ns/op	 192.62 MB/s	   11416 B/op	     160 allocs/op
+BenchmarkDecoder_Binding_Sjson-14                	   88503	     27140 ns/op	 408.99 MB/s	    9552 B/op	      63 allocs/op
+BenchmarkDecoder_Binding_Jsoniter-14             	  177135	     13642 ns/op	 813.68 MB/s	   10608 B/op	     139 allocs/op
+BenchmarkDecoder_Parallel_Generic_Sonic-14       	  662463	      3888 ns/op	2854.79 MB/s	   44298 B/op	     106 allocs/op
+BenchmarkDecoder_Parallel_Generic_StdLib-14      	  111523	     21260 ns/op	 522.11 MB/s	   49467 B/op	     795 allocs/op
+BenchmarkDecoder_Parallel_Generic_Sjson-14       	  147475	     16400 ns/op	 676.83 MB/s	   45977 B/op	     659 allocs/op
+BenchmarkDecoder_Parallel_Generic_Jsoniter-14    	  121042	     19266 ns/op	 576.14 MB/s	   54256 B/op	    1085 allocs/op
+BenchmarkDecoder_Parallel_Binding_Sonic-14       	 1248445	      1805 ns/op	6150.48 MB/s	   22451 B/op	      42 allocs/op
+BenchmarkDecoder_Parallel_Binding_StdLib-14      	  211293	     11681 ns/op	 950.24 MB/s	   11416 B/op	     160 allocs/op
+BenchmarkDecoder_Parallel_Binding_Sjson-14       	  360314	      7238 ns/op	1533.51 MB/s	    9557 B/op	      63 allocs/op
+BenchmarkDecoder_Parallel_Binding_Jsoniter-14    	  697296	      3702 ns/op	2998.56 MB/s	   10605 B/op	     139 allocs/op
 
 ===== 结构体 Unmarshal 对比（零分配优化）：
-BenchmarkCompareMedium/SjsonUnmarshal-14         	 1703041	      2129 ns/op	       0 B/op	       0 allocs/op
-BenchmarkCompareMedium/StdUnmarshal-14           	  389761	      8536 ns/op	     504 B/op	      11 allocs/op
-BenchmarkCompareMedium/JsoniterUnmarshal-14      	 1593063	      2281 ns/op	     352 B/op	      38 allocs/op
+BenchmarkCompareMedium/SjsonUnmarshal-14         	  780171	      2584 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCompareMedium/StdUnmarshal-14           	  263581	      9183 ns/op	     504 B/op	      11 allocs/op
+BenchmarkCompareMedium/JsoniterUnmarshal-14      	 1000000	      2066 ns/op	     352 B/op	      38 allocs/op
 ```
 
 ### 8. Marshal 性能测试
@@ -397,27 +397,27 @@ pkg: github.com/linkxzhou/sjson
 cpu: Apple M4 Pro
 
 ===== 最新测试结果：
-BenchmarkEncoder_Generic_Sonic-14                	   89494	     26953 ns/op	 411.84 MB/s	   13208 B/op	      40 allocs/op
-BenchmarkEncoder_Generic_StdLib-14               	   60129	     40048 ns/op	 277.17 MB/s	   32904 B/op	     653 allocs/op
-BenchmarkEncoder_Generic_Sjson-14                	  114616	     20931 ns/op	 530.32 MB/s	   19309 B/op	     615 allocs/op
-BenchmarkEncoder_Generic_Jsoniter-14             	  141650	     17234 ns/op	 644.09 MB/s	   17998 B/op	     153 allocs/op
-BenchmarkEncoder_Binding_Sonic-14                	  260524	      9200 ns/op	1206.54 MB/s	    9605 B/op	       2 allocs/op
-BenchmarkEncoder_Binding_StdLib-14               	  318076	      7528 ns/op	1474.42 MB/s	    9479 B/op	       1 allocs/op
-BenchmarkEncoder_Binding_Sjson-14                	  419595	      5801 ns/op	1913.60 MB/s	    9479 B/op	       1 allocs/op
-BenchmarkEncoder_Binding_Jsoniter-14             	  272227	      8923 ns/op	1244.00 MB/s	    9487 B/op	       2 allocs/op
-BenchmarkEncoder_Parallel_Generic_Sonic-14       	  393634	      7340 ns/op	1512.26 MB/s	   13529 B/op	      40 allocs/op
-BenchmarkEncoder_Parallel_Generic_StdLib-14      	  116995	     17688 ns/op	 627.53 MB/s	   32897 B/op	     653 allocs/op
-BenchmarkEncoder_Parallel_Generic_Sjson-14       	  242995	     10330 ns/op	1074.59 MB/s	   19304 B/op	     615 allocs/op
-BenchmarkEncoder_Parallel_Generic_Jsoniter-14    	  344456	      6419 ns/op	1729.23 MB/s	   17993 B/op	     153 allocs/op
-BenchmarkEncoder_Parallel_Binding_Sonic-14       	 1087363	      2565 ns/op	4328.13 MB/s	   10121 B/op	       2 allocs/op
-BenchmarkEncoder_Parallel_Binding_StdLib-14      	  882867	      2398 ns/op	4628.69 MB/s	    9475 B/op	       1 allocs/op
-BenchmarkEncoder_Parallel_Binding_Sjson-14       	  939543	      2481 ns/op	4474.54 MB/s	    9476 B/op	       1 allocs/op
-BenchmarkEncoder_Parallel_Binding_Jsoniter-14    	  983356	      2516 ns/op	4411.10 MB/s	    9490 B/op	       2 allocs/op
+BenchmarkEncoder_Generic_Sonic-14                	   82938	     27268 ns/op	 407.07 MB/s	   13192 B/op	      40 allocs/op
+BenchmarkEncoder_Generic_StdLib-14               	   60769	     38969 ns/op	 284.85 MB/s	   32907 B/op	     653 allocs/op
+BenchmarkEncoder_Generic_Sjson-14                	  111355	     21867 ns/op	 507.61 MB/s	   19311 B/op	     615 allocs/op
+BenchmarkEncoder_Generic_Jsoniter-14             	   85224	     28605 ns/op	 388.05 MB/s	   17999 B/op	     153 allocs/op
+BenchmarkEncoder_Binding_Sonic-14                	  282692	      8507 ns/op	1304.79 MB/s	    9567 B/op	       2 allocs/op
+BenchmarkEncoder_Binding_StdLib-14               	  289981	      7373 ns/op	1505.46 MB/s	    9479 B/op	       1 allocs/op
+BenchmarkEncoder_Binding_Sjson-14                	  446445	      5487 ns/op	2022.83 MB/s	    9479 B/op	       1 allocs/op
+BenchmarkEncoder_Binding_Jsoniter-14             	  109238	     21617 ns/op	 513.49 MB/s	    9487 B/op	       2 allocs/op
+BenchmarkEncoder_Parallel_Generic_Sonic-14       	  428227	      5735 ns/op	1935.47 MB/s	   13669 B/op	      40 allocs/op
+BenchmarkEncoder_Parallel_Generic_StdLib-14      	  176475	     14125 ns/op	 785.86 MB/s	   32897 B/op	     653 allocs/op
+BenchmarkEncoder_Parallel_Generic_Sjson-14       	  360699	      7623 ns/op	1456.09 MB/s	   19305 B/op	     615 allocs/op
+BenchmarkEncoder_Parallel_Generic_Jsoniter-14   	  368437	      6610 ns/op	1679.28 MB/s	   17992 B/op	     153 allocs/op
+BenchmarkEncoder_Parallel_Binding_Sonic-14       	 1335554	      1770 ns/op	6269.72 MB/s	   10881 B/op	       2 allocs/op
+BenchmarkEncoder_Parallel_Binding_StdLib-14      	  903266	      2720 ns/op	4081.36 MB/s	    9483 B/op	       1 allocs/op
+BenchmarkEncoder_Parallel_Binding_Sjson-14       	  933097	      2566 ns/op	4324.97 MB/s	    9482 B/op	       1 allocs/op
+BenchmarkEncoder_Parallel_Binding_Jsoniter-14   	  572749	      4115 ns/op	2697.68 MB/s	    9486 B/op	       2 allocs/op
 
 ===== 结构体 Marshal 对比：
-BenchmarkCompareMedium/SjsonMarshal-14           	11975430	       285.4 ns/op	     216 B/op	       2 allocs/op
-BenchmarkCompareMedium/StdMarshal-14             	13872591	       262.0 ns/op	     216 B/op	       2 allocs/op
-BenchmarkCompareMedium/JsoniterMarshal-14        	14179768	       256.7 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/SjsonMarshal-14           	 8981481	       259.1 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/StdMarshal-14             	 9229821	       275.1 ns/op	     216 B/op	       2 allocs/op
+BenchmarkCompareMedium/JsoniterMarshal-14        	 4366969	       555.4 ns/op	     216 B/op	       2 allocs/op
 ```
 
 ---
@@ -430,8 +430,8 @@ BenchmarkCompareMedium/JsoniterMarshal-14        	14179768	       256.7 ns/op	  
 
 | 文档 | 说明 |
 |------|------|
-| [PLAN.md](PLAN.md) | 功能完整性与性能改进计划，记录数值解析、null/指针语义、流式解析、错误处理等核心修复 |
-| [OPTIMIZATION_PLAN.md](OPTIMIZATION_PLAN.md) | 性能优化计划，含 8 项优化（OPT-1 ~ OPT-8）：unsafe 字段偏移、SWAR 转义检测、内联 Token 消费、快速整数解析、buffer pool、二分查找字段匹配、Opcode 解释器、ShapeSig 特化 |
+| [./plan/PLAN.md](PLAN.md) | 功能完整性与性能改进计划，记录数值解析、null/指针语义、流式解析、错误处理等核心修复 |
+| [./plan/OPTIMIZATION_PLAN.md](OPTIMIZATION_PLAN.md) | 性能优化计划，含 8 项优化（OPT-1 ~ OPT-8）：unsafe 字段偏移、SWAR 转义检测、内联 Token 消费、快速整数解析、buffer pool、二分查找字段匹配、Opcode 解释器、ShapeSig 特化 |
 | [README_BENCH.md](README_BENCH.md) | 详细性能对比报告，含 lexer、编码器、解码器各阶段基准测试数据 |
 
 ### 测试报告

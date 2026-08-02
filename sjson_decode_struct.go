@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
-	"sync"
 )
 
 // 解码对象
@@ -215,28 +213,28 @@ done3:
 	return nil
 }
 
-// 缓存结构体字段的大小写不敏感映射，仅在精确匹配失败时作为兜底使用
-// （与 encoding/json 行为一致：优先精确匹配，找不到再尝试大小写不敏感匹配）
-// 注：精确匹配已改为 (len, head8) 比较（见 decodeStruct），不再需要 map 版本的精确字段映射。
-var fieldMapCaseInsensitiveCache = sync.Map{} // map[reflect.Type]map[string]int
-
-// 获取大小写不敏感的字段映射（带缓存）
-func getFieldMapCaseInsensitive(structType reflect.Type, fields []structField) map[string]int {
-	if cachedMap, ok := fieldMapCaseInsensitiveCache.Load(structType); ok {
-		return cachedMap.(map[string]int)
+// equalFoldASCII 做零分配的 ASCII 大小写不敏感字节切片比较。
+// JSON 字段名几乎都是 ASCII，这比 strings.EqualFold + bytesToString 快且不分配。
+//
+//go:inline
+func equalFoldASCII(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
 	}
-
-	fieldMap := make(map[string]int, len(fields))
-	for i, field := range fields {
-		lower := strings.ToLower(bytesToString(field.name))
-		// 若有冲突，保留第一个（与 encoding/json 的"第一个不区分大小写匹配"近似）
-		if _, exists := fieldMap[lower]; !exists {
-			fieldMap[lower] = i
+	for i := range a {
+		ca, cb := a[i], b[i]
+		// ASCII 大小写折叠：仅 A-Z/a-z 需要处理
+		if ca >= 'A' && ca <= 'Z' {
+			ca += 32
+		}
+		if cb >= 'A' && cb <= 'Z' {
+			cb += 32
+		}
+		if ca != cb {
+			return false
 		}
 	}
-
-	fieldMapCaseInsensitiveCache.Store(structType, fieldMap)
-	return fieldMap
+	return true
 }
 
 // 解码结构体
@@ -285,12 +283,14 @@ func (d *Decoder) decodeStruct(dst reflect.Value) error {
 			}
 		}
 
-		// 精确匹配失败时，尝试大小写不敏感兜底匹配（与 encoding/json 行为一致）
+		// 精确匹配失败时，尝试大小写不敏感兜底匹配（与 encoding/json 行为一致）。
+		// 零分配优化：逐字段做 ASCII 大小写折叠比较，避免 strings.ToLower 的内存分配。
 		if fieldPos < 0 {
-			ciMap := getFieldMapCaseInsensitive(structType, fields)
-			lookupKey := bytesToString(keyBytes)
-			if idx, exists := ciMap[strings.ToLower(lookupKey)]; exists {
-				fieldPos = idx
+			for i := range fields {
+				if equalFoldASCII(keyBytes, fields[i].name) {
+					fieldPos = i
+					break
+				}
 			}
 		}
 
